@@ -155,6 +155,7 @@ pattern Keyed v <- (isKeyed &&& id -> (True,v)) where
 class HasFeatures a where
   getFeatures :: a -> Features
   setFeatures :: Features -> a -> a
+  addFeatures :: Features -> a -> a
   {-# INLINE addFeatures #-}
   addFeatures fs a = setFeatures (getFeatures a <> fs) a
 
