@@ -212,6 +212,14 @@ instance HasClasses View where
   addClasses _ v@SomeView {} = v
   addClasses cs v = v { features = (features v) { classes = Set.union (Set.fromList cs) (classes (features v)) } }
 
+instance HasClasses Features where
+  {-# INLINE getClasses #-}
+  getClasses fs = Set.toList (classes fs)
+  {-# INLINE setClasses #-}
+  setClasses cs fs = fs { classes = Set.fromList cs }
+  {-# INLINE addClasses #-}
+  addClasses cs fs = fs { classes = Set.union (Set.fromList cs) (classes fs) }
+
 pattern Classes :: HasClasses a => [Txt] -> a -> a
 pattern Classes cs v <- ((getClasses &&& id) -> (cs,v)) where
   Classes cs v = setClasses cs v
@@ -248,6 +256,14 @@ instance HasStyles View where
   addStyles _ v@ComponentView {} = v
   addStyles _ v@SomeView {} = v
   addStyles cs v = v { features = (features v) { styles = Map.union (Map.fromList (coerceFromStyles cs)) (styles (features v)) } }
+
+instance HasStyles Features where
+  {-# INLINE getStyles #-}
+  getStyles fs = coerceToStyles (Map.toList (styles fs))
+  {-# INLINE setStyles #-}
+  setStyles ss fs = fs { styles = Map.fromList (coerceFromStyles ss) }
+  {-# INLINE addStyles #-}
+  addStyles ss fs = fs { styles = Map.union (Map.fromList (coerceFromStyles ss)) (styles fs) }
 
 pattern Styles :: HasStyles a => [Style] -> a -> a
 pattern Styles ss v <- ((getStyles &&& id) -> (ss,v)) where
@@ -286,6 +302,14 @@ instance HasListeners View where
   addListeners _ v@SomeView {} = v
   addListeners ls v = v { features = (features v) { listeners = ls ++ (listeners (features v)) } }
 
+instance HasListeners Features where
+  {-# INLINE getListeners #-}
+  getListeners fs = listeners fs
+  {-# INLINE setListeners #-}
+  setListeners ls fs = fs { listeners = ls }
+  {-# INLINE addListeners #-}
+  addListeners ls fs = fs { listeners = ls ++ listeners fs }
+
 pattern Listeners :: [Listener] -> View -> View
 pattern Listeners ls v <- ((getListeners &&& id) -> (ls,v)) where
   Listeners ls v = setListeners ls v
@@ -320,6 +344,14 @@ instance HasAttributes View where
   addAttributes as v@RawView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
   addAttributes _ v = v
 
+instance HasAttributes Features where
+  {-# INLINE getAttributes #-}
+  getAttributes fs = coerceToAttributes (Map.toList (attributes fs))
+  {-# INLINE setAttributes #-}
+  setAttributes as fs = fs { attributes = Map.fromList (coerceFromAttributes as) }
+  {-# INLINE addAttributes #-}
+  addAttributes as fs = fs { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes fs) }
+
 pattern Attributes :: HasAttributes a => [Attribute] -> a -> a
 pattern Attributes as v <- ((getAttributes &&& id) -> (as,v)) where
   Attributes as v = setAttributes as v
@@ -350,6 +382,14 @@ instance HasSVGAttributes View where
   addSVGAttributes as v@SVGView {} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes (features v)) } }
   addSVGAttributes as v@KSVGView {} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes (features v)) } }
   addSVGAttributes _ v = v
+
+instance HasSVGAttributes Features where
+  {-# INLINE getSVGAttributes #-}
+  getSVGAttributes fs = coerceToSVGAttributes (Map.toList (attributes fs))
+  {-# INLINE setSVGAttributes #-}
+  setSVGAttributes as fs = fs { attributes = Map.fromList (coerceFromSVGAttributes as) }
+  {-# INLINE addSVGAttributes #-}
+  addSVGAttributes as fs = fs { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes fs) }
 
 pattern SVGAttributes :: HasSVGAttributes a => [SVGAttribute] -> a -> a
 pattern SVGAttributes as v <- ((getSVGAttributes &&& id) -> (as,v)) where
@@ -385,6 +425,14 @@ instance HasProperties View where
   addProperties ps v@RawView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
   addProperties _ v = v
 
+instance HasProperties Features where
+  {-# INLINE getProperties #-}
+  getProperties fs = coerceToProperties (Map.toList (properties fs))
+  {-# INLINE setProperties #-}
+  setProperties ps fs = fs { properties = Map.fromList (coerceFromProperties ps) }
+  {-# INLINE addProperties #-}
+  addProperties ps fs = fs { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties fs) }
+
 pattern Properties :: HasProperties a => [Property] -> a -> a
 pattern Properties ps v <- ((getProperties &&& id) -> (ps,v)) where
   Properties ps v = setProperties ps v
@@ -415,6 +463,14 @@ instance HasSVGProperties View where
   addSVGProperties ps v@SVGView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties (features v)) } }
   addSVGProperties ps v@KSVGView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties (features v)) } }
   addSVGProperties _ v = v
+
+instance HasSVGProperties Features where
+  {-# INLINE getSVGProperties #-}
+  getSVGProperties fs = coerceToSVGProperties (Map.toList (properties fs))
+  {-# INLINE setSVGProperties #-}
+  setSVGProperties ps fs = fs { properties = Map.fromList (coerceFromSVGProperties ps) }
+  {-# INLINE addSVGProperties #-}
+  addSVGProperties ps fs = fs { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties fs) }
 
 pattern SVGProperties :: HasSVGProperties a => [SVGProperty] -> a -> a
 pattern SVGProperties ps v <- ((getSVGProperties &&& id) -> (ps,v)) where
@@ -452,6 +508,14 @@ instance HasLifecycles View where
   addLifecycles _ v@ComponentView {} = v
   addLifecycles _ v@SomeView {} = v
   addLifecycles as v = v { features = (features v) { lifecycles = as ++ (lifecycles (features v)) } }
+
+instance HasLifecycles Features where
+  {-# INLINE getLifecycles #-}
+  getLifecycles Features {..} = lifecycles
+  {-# INLINE setLifecycles #-}
+  setLifecycles ls fs = fs { lifecycles = ls }
+  {-# INLINE addLifecycles #-}
+  addLifecycles ls fs = fs { lifecycles = as ++ lifecycles fs }
 
 pattern Lifecycles :: HasLifecycles a => [Lifecycle] -> a -> a
 pattern Lifecycles lc v <- ((getLifecycles &&& id) -> (lc,v)) where
