@@ -152,12 +152,41 @@ pattern Keyed :: View -> View
 pattern Keyed v <- (isKeyed &&& id -> (True,v)) where
   Keyed v = keyed v
 
+class HasFeatures a where
+  getFeatures :: a -> Features
+  setFeatures :: Features -> a -> a
+  {-# INLINE addFeatures #-}
+  addFeatures fs a = setFeatures (getFeatures a <> fs) a
+
+instance HasFeatures View where
+  {-# INLINE getFeatures #-}
+  getFeatures NullView {} = mempty
+  getFeatures TextView {} = mempty
+  getFeatures ComponentView {} = mempty
+  getFeatures SomeView {} = mempty
+  getFeatures v = features v
+  {-# INLINE setFeatures #-}
+  setFeatures _ v@NullView {} = v
+  setFeatures _ v@TextView {} = v
+  setFeatures _ v@ComponentView {} = v
+  setFeatures _ v@SomeView {} = v
+  setFeatures fs v = v { features = fs }
+
+pattern Feats :: HasFeatures a => Features -> a -> a
+pattern Feats fs a <- ((getFeatures &&& id) -> (fs,a)) where
+  Feats fs a = setFeatures fs a
+
+pattern AddFeats :: HasFeatures a => Features -> a -> a
+pattern AddFeats fs a <- ((getFeatures &&& id) -> (fs,a)) where
+  AddFeats fs a = addFeatures fs a
+
 -- Classes
 
 class HasClasses a where
   getClasses :: a -> [Txt]
   setClasses :: [Txt] -> a -> a
   addClasses :: [Txt] -> a -> a
+  {-# INLINE addClasses #-}
   addClasses cs a = setClasses (getClasses a ++ cs) a
 
 instance HasClasses View where
@@ -194,6 +223,7 @@ class HasStyles a where
   getStyles :: a -> [Style]
   setStyles :: [Style] -> a -> a
   addStyles :: [Style] -> a -> a
+  {-# INLINE addStyles #-}
   addStyles ss a = setStyles (getStyles a ++ ss) a
 
 instance HasStyles View where
@@ -230,6 +260,7 @@ class HasListeners a where
   getListeners :: a -> [Listener]
   setListeners :: [Listener] -> a -> a
   addListeners :: [Listener] -> a -> a
+  {-# INLINE addListeners #-}
   addListeners ls a = setListeners (getListeners a ++ ls) a
 
 instance HasListeners View where
@@ -266,6 +297,7 @@ class HasAttributes a where
   getAttributes :: a -> [Attribute]
   setAttributes :: [Attribute] -> a -> a
   addAttributes :: [Attribute] -> a -> a
+  {-# INLINE addAttributes #-}
   addAttributes as a = setAttributes (getAttributes a ++ as) a
 
 instance HasAttributes View where
@@ -299,6 +331,7 @@ class HasSVGAttributes a where
   getSVGAttributes :: a -> [SVGAttribute]
   setSVGAttributes :: [SVGAttribute] -> a -> a
   addSVGAttributes :: [SVGAttribute] -> a -> a
+  {-# INLINE addSVGAttributes #-}
   addSVGAttributes as a = setSVGAttributes (getSVGAttributes a ++ as) a
 
 instance HasSVGAttributes View where
@@ -329,6 +362,7 @@ class HasProperties a where
   getProperties :: a -> [Property]
   setProperties :: [Property] -> a -> a
   addProperties :: [Property] -> a -> a
+  {-# INLINE addProperties #-}
   addProperties ps a = setProperties (getProperties a ++ ps) a
 
 instance HasProperties View where
@@ -362,6 +396,7 @@ class HasSVGProperties a where
   getSVGProperties :: a -> [SVGProperty]
   setSVGProperties :: [SVGProperty] -> a -> a
   addSVGProperties :: [SVGProperty] -> a -> a
+  {-# INLINE addSVGProperties #-}
   addSVGProperties ps a = setSVGProperties (getSVGProperties a ++ ps) a
 
 instance HasSVGProperties View where
@@ -392,6 +427,7 @@ class HasLifecycles a where
   getLifecycles :: a -> [Lifecycle]
   setLifecycles :: [Lifecycle] -> a -> a
   addLifecycles ::  [Lifecycle] -> a -> a
+  {-# INLINE addLifecycles #-}
   addLifecycles ls a = setLifecycles (getLifecycles a ++ ls) a
 
 instance HasLifecycles View where
@@ -428,6 +464,7 @@ class HasXLinks a where
   getXLinks :: a -> [XLink]
   setXLinks :: [XLink] -> a -> a
   addXLinks :: [XLink] -> a -> a
+  {-# INLINE addXLinks #-}
   addXLinks xl a = setXLinks (getXLinks a ++ xl) a
 
 instance HasXLinks View where
@@ -458,6 +495,7 @@ class HasChildren a where
   getChildren :: a -> [View]
   setChildren :: [View] -> a -> a
   addChildren :: [View] -> a -> a
+  {-# INLINE addChildren #-}
   addChildren cs a = setChildren (getChildren a ++ cs) a
 
 instance HasChildren View where
@@ -488,6 +526,7 @@ class HasKeyedChildren a where
   getKeyedChildren :: a -> [(Int,View)]
   setKeyedChildren :: [(Int,View)] -> a -> a
   addKeyedChildren :: [(Int,View)] -> a -> a
+  {-# INLINE addKeyedChildren #-}
   addKeyedChildren cs a = setKeyedChildren (getKeyedChildren a ++ cs) a
 
 instance HasKeyedChildren View where
