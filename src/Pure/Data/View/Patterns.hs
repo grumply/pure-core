@@ -12,6 +12,7 @@ module Pure.Data.View.Patterns
   , pattern Null
   , pattern Raw
   , pattern Keyed
+  , HasFeatures(..), pattern Feats, pattern AddFeats
   , HasClasses(..), pattern Classes, pattern AddClasses
   , HasStyles(..), pattern Styles, pattern AddStyles
   , HasProperties(..), pattern Properties, pattern AddProperties
@@ -25,25 +26,26 @@ module Pure.Data.View.Patterns
   , (<|#|>), (|#>)
   ) where
 
-import Pure.Data.Default
+-- from pure-default
+import Pure.Data.Default (Default(..))
+
+-- from pure-core (local)
 import Pure.Data.View
+
+-- from pure-txgt
 import Pure.Data.Txt (Txt)
 
+-- from base
 import Control.Arrow ((&&&))
-
 import Control.Monad (void)
-
-import Data.Coerce
-import Data.Typeable
-
+import Data.Coerce (coerce)
+import Data.Monoid ((<>))
+import Data.Typeable (Typeable,TypeRep(),typeOf)
 import Data.List as List (null)
 import Data.Map.Strict as Map (fromList,null,empty,union,toList)
 import Data.IntMap.Strict as IntMap (empty)
 import Data.Set as Set (Set,fromList,null,empty,union,toList)
-
-import GHC.Exts
-
-import Unsafe.Coerce
+import Unsafe.Coerce (unsafeCoerce)
 
 newtype Style = Style (Txt,Txt)
 coerceFromStyles :: [Style] -> [(Txt,Txt)]
