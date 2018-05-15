@@ -1,5 +1,29 @@
 {-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings #-}
-module Pure.Data.View.Patterns where
+module Pure.Data.View.Patterns
+  ( pattern SimpleHTML
+  , pattern SimpleSVG
+  , Style(..)
+  , Property(..)
+  , SVGProperty(..)
+  , Attribute(..)
+  , SVGAttribute(..)
+  , XLink(..)
+  , pattern Component
+  , pattern Null
+  , pattern Raw
+  , pattern Keyed
+  , HasClasses(..), pattern Classes, pattern AddClasses
+  , HasStyles(..), pattern Styles, pattern AddStyles
+  , HasProperties(..), pattern Properties, pattern AddProperties
+  , HasSVGProperties(..), pattern SVGProperties, pattern AddSVGProperties
+  , HasAttributes(..), pattern Attributes, pattern AddAttributes
+  , HasSVGAttributes(..), pattern SVGAttributes, pattern AddSVGAttributes
+  , HasXLinks(..), pattern XLinks, pattern AddXLinks
+  , HasChildren(..), pattern Children, pattern AddChildren
+  , HasKeyedChildren(..), pattern KeyedChildren, pattern AddKeyedChildren
+  , (<|), (<||>), (|>)
+  , (<|#|>), (|#>)
+  ) where
 
 import Pure.Data.Default
 import Pure.Data.View
@@ -124,294 +148,365 @@ pattern Keyed :: View -> View
 pattern Keyed v <- (isKeyed &&& id -> (True,v)) where
   Keyed v = keyed v
 
--- Children
-
-{-# INLINE getChildren #-}
-getChildren v@HTMLView {} = Just (children v)
-getChildren v@SVGView {} = Just (children v)
-getChildren _  = Nothing
-
-{-# INLINE setChildren #-}
-setChildren v@HTMLView {} cs = v { children = cs }
-setChildren v@SVGView {} cs = v { children = cs }
-setChildren v _ = v
-
-pattern Children :: [View] -> View -> View
-pattern Children cs v <- ((getChildren &&& id) -> (Just cs,v)) where
-  Children cs v = setChildren v cs
-
--- Keyed Children
-
-{-# INLINE setKeyedChildren #-}
-setKeyedChildren v@KHTMLView {} cs = v { keyedChildren = cs }
-setKeyedChildren v@KSVGView {} cs = v { keyedChildren = cs }
-setKeyedChildren v _ = v
-
-{-# INLINE getKeyedChildren #-}
-getKeyedChildren v@KHTMLView {} = Just (keyedChildren v)
-getKeyedChildren v@SVGView {} = Just (keyedChildren v)
-getKeyedChildren _ = Nothing
-
-pattern KeyedChildren :: [(Int,View)] -> View -> View
-pattern KeyedChildren ks v <- ((getKeyedChildren &&& id) -> (Just ks,v)) where
-  KeyedChildren ks v = setKeyedChildren v ks
-
 -- Classes
 
-{-# INLINE getClasses #-}
-getClasses NullView {} = Nothing
-getClasses TextView {} = Nothing
-getClasses ComponentView {} = Nothing
-getClasses SomeView {} = Nothing
-getClasses v = Just (Set.toList (classes (features v)))
+class HasClasses a where
+  getClasses :: a -> [Txt]
+  setClasses :: [Txt] -> a -> a
+  addClasses :: [Txt] -> a -> a
+  addClasses cs a = setClasses (getClasses a ++ cs) a
 
-{-# INLINE setClasses #-}
-setClasses _ v@NullView {} = v
-setClasses _ v@TextView {} = v
-setClasses _ v@ComponentView {} = v
-setClasses _ v@SomeView {} = v
-setClasses cs v = v { features = (features v) { classes = Set.fromList cs } }
+instance HasClasses View where
+  {-# INLINE getClasses #-}
+  getClasses NullView {} = []
+  getClasses TextView {} = []
+  getClasses ComponentView {} = []
+  getClasses SomeView {} = []
+  getClasses v = Set.toList (classes (features v))
+  {-# INLINE setClasses #-}
+  setClasses _ v@NullView {} = v
+  setClasses _ v@TextView {} = v
+  setClasses _ v@ComponentView {} = v
+  setClasses _ v@SomeView {} = v
+  setClasses cs v = v { features = (features v) { classes = Set.fromList cs } }
+  {-# INLINE addClasses #-}
+  addClasses _ v@NullView {} = v
+  addClasses _ v@TextView {} = v
+  addClasses _ v@ComponentView {} = v
+  addClasses _ v@SomeView {} = v
+  addClasses cs v = v { features = (features v) { classes = Set.union (Set.fromList cs) (classes (features v)) } }
 
-{-# INLINE addClasses #-}
-addClasses _ v@NullView {} = v
-addClasses _ v@TextView {} = v
-addClasses _ v@ComponentView {} = v
-addClasses _ v@SomeView {} = v
-addClasses cs v = v { features = (features v) { classes = Set.union (Set.fromList cs) (classes (features v)) } }
-
-pattern Classes :: [Txt] -> View -> View
-pattern Classes cs v <- ((getClasses &&& id) -> (Just cs,v)) where
+pattern Classes :: HasClasses a => [Txt] -> a -> a
+pattern Classes cs v <- ((getClasses &&& id) -> (cs,v)) where
   Classes cs v = setClasses cs v
 
-pattern AddClasses :: [Txt] -> View -> View
-pattern AddClasses cs v <- ((getClasses &&& id) -> (Just cs,v)) where
+pattern AddClasses :: HasClasses a => [Txt] -> a -> a
+pattern AddClasses cs v <- ((getClasses &&& id) -> (cs,v)) where
   AddClasses cs v = addClasses cs v
 
 -- Styles
 
-{-# INLINE getStyles #-}
-getStyles NullView {} = Nothing
-getStyles (TextView _ _) = Nothing
-getStyles ComponentView {} = Nothing
-getStyles SomeView {} = Nothing
-getStyles v = Just (coerceToStyles (Map.toList (styles (features v))))
+class HasStyles a where
+  getStyles :: a -> [Style]
+  setStyles :: [Style] -> a -> a
+  addStyles :: [Style] -> a -> a
+  addStyles ss a = setStyles (getStyles a ++ ss) a
 
-{-# INLINE setStyles #-}
-setStyles _ v@NullView {} = v
-setStyles _ v@TextView {} = v
-setStyles _ v@ComponentView {} = v
-setStyles _ v@SomeView {} = v
-setStyles ss v = v { features = (features v) { styles = Map.fromList (coerceFromStyles ss) } }
+instance HasStyles View where
+  {-# INLINE getStyles #-}
+  getStyles NullView {} = []
+  getStyles (TextView _ _) = []
+  getStyles ComponentView {} = []
+  getStyles SomeView {} = []
+  getStyles v = coerceToStyles (Map.toList (styles (features v)))
+  {-# INLINE setStyles #-}
+  setStyles _ v@NullView {} = v
+  setStyles _ v@TextView {} = v
+  setStyles _ v@ComponentView {} = v
+  setStyles _ v@SomeView {} = v
+  setStyles ss v = v { features = (features v) { styles = Map.fromList (coerceFromStyles ss) } }
+  {-# INLINE addStyles #-}
+  addStyles _ v@NullView {} = v
+  addStyles _ v@TextView {} = v
+  addStyles _ v@ComponentView {} = v
+  addStyles _ v@SomeView {} = v
+  addStyles cs v = v { features = (features v) { styles = Map.union (Map.fromList (coerceFromStyles cs)) (styles (features v)) } }
 
-{-# INLINE addStyles #-}
-addStyles _ v@NullView {} = v
-addStyles _ v@TextView {} = v
-addStyles _ v@ComponentView {} = v
-addStyles _ v@SomeView {} = v
-addStyles cs v = v { features = (features v) { styles = Map.union (Map.fromList (coerceFromStyles cs)) (styles (features v)) } }
-
-pattern Styles :: [Style] -> View -> View
-pattern Styles ss v <- ((getStyles &&& id) -> (Just ss,v)) where
+pattern Styles :: HasStyles a => [Style] -> a -> a
+pattern Styles ss v <- ((getStyles &&& id) -> (ss,v)) where
   Styles ss v = setStyles ss v
 
-pattern AddStyles :: [Style] -> View -> View
-pattern AddStyles ss v <- ((getStyles &&& id) -> (Just ss,v)) where
+pattern AddStyles :: HasStyles a => [Style] -> a -> a
+pattern AddStyles ss v <- ((getStyles &&& id) -> (ss,v)) where
   AddStyles ss v = addStyles ss v
 
 -- Listeners
 
-{-# INLINE getListeners #-}
-getListeners NullView {} = Nothing
-getListeners TextView {} = Nothing
-getListeners ComponentView {} = Nothing
-getListeners SomeView {} = Nothing
-getListeners v = Just (listeners (features v))
+class HasListeners a where
+  getListeners :: a -> [Listener]
+  setListeners :: [Listener] -> a -> a
+  addListeners :: [Listener] -> a -> a
+  addListeners ls a = setListeners (getListeners a ++ ls) a
 
-{-# INLINE setListeners #-}
-setListeners _ v@NullView {} = v
-setListeners _ v@TextView {} = v
-setListeners _ v@ComponentView {} = v
-setListeners _ v@SomeView {} = v
-setListeners ls v = v { features = (features v) { listeners = ls } }
-
-{-# INLINE addListeners #-}
-addListeners _ v@NullView {} = v
-addListeners _ v@TextView {} = v
-addListeners _ v@ComponentView {} = v
-addListeners _ v@SomeView {} = v
-addListeners ls v = v { features = (features v) { listeners = ls ++ (listeners (features v)) } }
+instance HasListeners View where
+  {-# INLINE getListeners #-}
+  getListeners NullView {} = []
+  getListeners TextView {} = []
+  getListeners ComponentView {} = []
+  getListeners SomeView {} = []
+  getListeners v = listeners (features v)
+  {-# INLINE setListeners #-}
+  setListeners _ v@NullView {} = v
+  setListeners _ v@TextView {} = v
+  setListeners _ v@ComponentView {} = v
+  setListeners _ v@SomeView {} = v
+  setListeners ls v = v { features = (features v) { listeners = ls } }
+  {-# INLINE addListeners #-}
+  addListeners _ v@NullView {} = v
+  addListeners _ v@TextView {} = v
+  addListeners _ v@ComponentView {} = v
+  addListeners _ v@SomeView {} = v
+  addListeners ls v = v { features = (features v) { listeners = ls ++ (listeners (features v)) } }
 
 pattern Listeners :: [Listener] -> View -> View
-pattern Listeners ls v <- ((getListeners &&& id) -> (Just ls,v)) where
+pattern Listeners ls v <- ((getListeners &&& id) -> (ls,v)) where
   Listeners ls v = setListeners ls v
 
 pattern AddListeners :: [Listener] -> View -> View
-pattern AddListeners ls v <- ((getListeners &&& id) -> (Just ls,v)) where
+pattern AddListeners ls v <- ((getListeners &&& id) -> (ls,v)) where
   AddListeners ls v = addListeners ls v
 
 -- Attributes
 
-{-# INLINE getAttributes #-}
-getAttributes v@HTMLView {} = Just (coerceToAttributes (Map.toList (attributes (features v))))
-getAttributes v@KHTMLView {} = Just (coerceToAttributes (Map.toList (attributes (features v))))
-getAttributes v@RawView {} = Just (coerceToAttributes (Map.toList (attributes (features v))))
-getAttributes _ = Nothing
+class HasAttributes a where
+  getAttributes :: a -> [Attribute]
+  setAttributes :: [Attribute] -> a -> a
+  addAttributes :: [Attribute] -> a -> a
+  addAttributes as a = setAttributes (getAttributes a ++ as) a
 
-{-# INLINE setAttributes #-}
-setAttributes as v@HTMLView {} = v { features = (features v) { attributes = Map.fromList (coerceFromAttributes as) } }
-setAttributes as v@KHTMLView {} = v { features = (features v) { attributes = Map.fromList (coerceFromAttributes as) } }
-setAttributes as v@RawView {} = v { features = (features v) { attributes = Map.fromList (coerceFromAttributes as) } }
-setAttributes _ v = v
+instance HasAttributes View where
+  {-# INLINE getAttributes #-}
+  getAttributes v@HTMLView {} = coerceToAttributes (Map.toList (attributes (features v)))
+  getAttributes v@KHTMLView {} = coerceToAttributes (Map.toList (attributes (features v)))
+  getAttributes v@RawView {} = coerceToAttributes (Map.toList (attributes (features v)))
+  getAttributes _ = []
+  {-# INLINE setAttributes #-}
+  setAttributes as v@HTMLView {} = v { features = (features v) { attributes = Map.fromList (coerceFromAttributes as) } }
+  setAttributes as v@KHTMLView {} = v { features = (features v) { attributes = Map.fromList (coerceFromAttributes as) } }
+  setAttributes as v@RawView {} = v { features = (features v) { attributes = Map.fromList (coerceFromAttributes as) } }
+  setAttributes _ v = v
+  {-# INLINE addAttributes #-}
+  addAttributes as v@HTMLView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
+  addAttributes as v@KHTMLView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
+  addAttributes as v@RawView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
+  addAttributes _ v = v
 
-{-# INLINE addAttributes #-}
-addAttributes as v@HTMLView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
-addAttributes as v@KHTMLView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
-addAttributes as v@RawView{} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromAttributes as)) (attributes (features v)) } }
-addAttributes _ v = v
-
-pattern Attributes :: [Attribute] -> View -> View
-pattern Attributes as v <- ((getAttributes &&& id) -> (Just as,v)) where
+pattern Attributes :: HasAttributes a => [Attribute] -> a -> a
+pattern Attributes as v <- ((getAttributes &&& id) -> (as,v)) where
   Attributes as v = setAttributes as v
 
-pattern AddAttributes :: [Attribute] -> View -> View
-pattern AddAttributes as v <- ((getAttributes &&& id) -> (Just as,v)) where
+pattern AddAttributes :: HasAttributes a => [Attribute] -> a -> a
+pattern AddAttributes as v <- ((getAttributes &&& id) -> (as,v)) where
   AddAttributes as v = addAttributes as v
 
 -- SVGAttributes
 
-{-# INLINE getSVGAttributes #-}
-getSVGAttributes v@SVGView {} = Just (coerceToSVGAttributes (Map.toList (attributes (features v))))
-getSVGAttributes v@KSVGView {} = Just (coerceToSVGAttributes (Map.toList (attributes (features v))))
-getSVGAttributes _ = Nothing
+class HasSVGAttributes a where
+  getSVGAttributes :: a -> [SVGAttribute]
+  setSVGAttributes :: [SVGAttribute] -> a -> a
+  addSVGAttributes :: [SVGAttribute] -> a -> a
+  addSVGAttributes as a = setSVGAttributes (getSVGAttributes a ++ as) a
 
-{-# INLINE setSVGAttributes #-}
-setSVGAttributes as v@SVGView {} = v { features = (features v) { attributes = Map.fromList (coerceFromSVGAttributes as) } }
-setSVGAttributes as v@KSVGView {} = v { features = (features v) { attributes = Map.fromList (coerceFromSVGAttributes as) } }
-setSVGAttributes _ v = v
+instance HasSVGAttributes View where
+  {-# INLINE getSVGAttributes #-}
+  getSVGAttributes v@SVGView {} = coerceToSVGAttributes (Map.toList (attributes (features v)))
+  getSVGAttributes v@KSVGView {} = coerceToSVGAttributes (Map.toList (attributes (features v)))
+  getSVGAttributes _ = []
+  {-# INLINE setSVGAttributes #-}
+  setSVGAttributes as v@SVGView {} = v { features = (features v) { attributes = Map.fromList (coerceFromSVGAttributes as) } }
+  setSVGAttributes as v@KSVGView {} = v { features = (features v) { attributes = Map.fromList (coerceFromSVGAttributes as) } }
+  setSVGAttributes _ v = v
+  {-# INLINE addSVGAttributes #-}
+  addSVGAttributes as v@SVGView {} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes (features v)) } }
+  addSVGAttributes as v@KSVGView {} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes (features v)) } }
+  addSVGAttributes _ v = v
 
-{-# INLINE addSVGAttributes #-}
-addSVGAttributes as v@SVGView {} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes (features v)) } }
-addSVGAttributes as v@KSVGView {} = v { features = (features v) { attributes = Map.union (Map.fromList (coerceFromSVGAttributes as)) (attributes (features v)) } }
-addSVGAttributes _ v = v
-
-pattern SVGAttributes :: [SVGAttribute] -> View -> View
-pattern SVGAttributes as v <- ((getSVGAttributes &&& id) -> (Just as,v)) where
+pattern SVGAttributes :: HasSVGAttributes a => [SVGAttribute] -> a -> a
+pattern SVGAttributes as v <- ((getSVGAttributes &&& id) -> (as,v)) where
   SVGAttributes as v = setSVGAttributes as v
 
-pattern AddSVGAttributes :: [SVGAttribute] -> View -> View
-pattern AddSVGAttributes as v <- ((getSVGAttributes &&& id) -> (Just as,v)) where
+pattern AddSVGAttributes :: HasSVGAttributes a => [SVGAttribute] -> a -> a
+pattern AddSVGAttributes as v <- ((getSVGAttributes &&& id) -> (as,v)) where
   AddSVGAttributes as v = addSVGAttributes as v
 
 -- Properties
 
-{-# INLINE getProperties #-}
-getProperties v@HTMLView{} = Just (coerceToProperties (Map.toList (properties (features v))))
-getProperties v@KHTMLView{} = Just (coerceToProperties (Map.toList (properties (features v))))
-getProperties v@RawView{} = Just (coerceToProperties (Map.toList (properties (features v))))
-getProperties _ = Nothing
+class HasProperties a where
+  getProperties :: a -> [Property]
+  setProperties :: [Property] -> a -> a
+  addProperties :: [Property] -> a -> a
+  addProperties ps a = setProperties (getProperties a ++ ps) a
 
-{-# INLINE setProperties #-}
-setProperties ps v@HTMLView{} = v { features = (features v) { properties = Map.fromList (coerceFromProperties ps) } }
-setProperties ps v@KHTMLView{} = v { features = (features v) { properties = Map.fromList (coerceFromProperties ps) } }
-setProperties ps v@RawView{} = v { features = (features v) { properties = Map.fromList (coerceFromProperties ps) } }
-setProperties _ v = v
+instance HasProperties View where
+  {-# INLINE getProperties #-}
+  getProperties v@HTMLView{} = coerceToProperties (Map.toList (properties (features v)))
+  getProperties v@KHTMLView{} = coerceToProperties (Map.toList (properties (features v)))
+  getProperties v@RawView{} = coerceToProperties (Map.toList (properties (features v)))
+  getProperties _ = []
+  {-# INLINE setProperties #-}
+  setProperties ps v@HTMLView{} = v { features = (features v) { properties = Map.fromList (coerceFromProperties ps) } }
+  setProperties ps v@KHTMLView{} = v { features = (features v) { properties = Map.fromList (coerceFromProperties ps) } }
+  setProperties ps v@RawView{} = v { features = (features v) { properties = Map.fromList (coerceFromProperties ps) } }
+  setProperties _ v = v
+  {-# INLINE addProperties #-}
+  addProperties ps v@HTMLView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
+  addProperties ps v@KHTMLView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
+  addProperties ps v@RawView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
+  addProperties _ v = v
 
-{-# INLINE addProperties #-}
-addProperties ps v@HTMLView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
-addProperties ps v@KHTMLView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
-addProperties ps v@RawView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromProperties ps)) (properties (features v)) } }
-addProperties _ v = v
-
-pattern Properties :: [Property] -> View -> View
-pattern Properties ps v <- ((getProperties &&& id) -> (Just ps,v)) where
+pattern Properties :: HasProperties a => [Property] -> a -> a
+pattern Properties ps v <- ((getProperties &&& id) -> (ps,v)) where
   Properties ps v = setProperties ps v
 
-pattern AddProperties :: [Property] -> View -> View
-pattern AddProperties as v <- ((getProperties &&& id) -> (Just as,v)) where
+pattern AddProperties :: HasProperties a => [Property] -> a -> a
+pattern AddProperties as v <- ((getProperties &&& id) -> (as,v)) where
   AddProperties as v = addProperties as v
 
 -- SVG Properties
 
-{-# INLINE getSVGProperties #-}
-getSVGProperties v@SVGView{} = Just (coerceToSVGProperties (Map.toList (properties (features v))))
-getSVGProperties v@KSVGView{} = Just (coerceToSVGProperties (Map.toList (properties (features v))))
-getSVGProperties _ = Nothing
+class HasSVGProperties a where
+  getSVGProperties :: a -> [SVGProperty]
+  setSVGProperties :: [SVGProperty] -> a -> a
+  addSVGProperties :: [SVGProperty] -> a -> a
+  addSVGProperties ps a = setSVGProperties (getSVGProperties a ++ ps) a
 
-{-# INLINE setSVGProperties #-}
-setSVGProperties ps v@SVGView{} = v { features = (features v) { properties = Map.fromList (coerceFromSVGProperties ps) } }
-setSVGProperties ps v@KSVGView{} = v { features = (features v) { properties = Map.fromList (coerceFromSVGProperties ps) } }
-setSVGProperties _ v = v
+instance HasSVGProperties View where
+  {-# INLINE getSVGProperties #-}
+  getSVGProperties v@SVGView{} = coerceToSVGProperties (Map.toList (properties (features v)))
+  getSVGProperties v@KSVGView{} = coerceToSVGProperties (Map.toList (properties (features v)))
+  getSVGProperties _ = []
+  {-# INLINE setSVGProperties #-}
+  setSVGProperties ps v@SVGView{} = v { features = (features v) { properties = Map.fromList (coerceFromSVGProperties ps) } }
+  setSVGProperties ps v@KSVGView{} = v { features = (features v) { properties = Map.fromList (coerceFromSVGProperties ps) } }
+  setSVGProperties _ v = v
+  {-# INLINE addSVGProperties #-}
+  addSVGProperties ps v@SVGView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties (features v)) } }
+  addSVGProperties ps v@KSVGView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties (features v)) } }
+  addSVGProperties _ v = v
 
-{-# INLINE addSVGProperties #-}
-addSVGProperties ps v@SVGView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties (features v)) } }
-addSVGProperties ps v@KSVGView {} = v { features = (features v) { properties = Map.union (Map.fromList (coerceFromSVGProperties ps)) (properties (features v)) } }
-addSVGProperties _ v = v
-
-pattern SVGProperties :: [SVGProperty] -> View -> View
-pattern SVGProperties ps v <- ((getSVGProperties &&& id) -> (Just ps,v)) where
+pattern SVGProperties :: HasSVGProperties a => [SVGProperty] -> a -> a
+pattern SVGProperties ps v <- ((getSVGProperties &&& id) -> (ps,v)) where
   SVGProperties ps v = setSVGProperties ps v
 
-pattern AddSVGProperties :: [SVGProperty] -> View -> View
-pattern AddSVGProperties as v <- ((getSVGProperties &&& id) -> (Just as,v)) where
+pattern AddSVGProperties :: HasSVGProperties a => [SVGProperty] -> a -> a
+pattern AddSVGProperties as v <- ((getSVGProperties &&& id) -> (as,v)) where
   AddSVGProperties as v = addSVGProperties as v
 
 -- Lifecycles
 
-{-# INLINE getLifecycles #-}
-getLifecycles NullView {} = Nothing
-getLifecycles TextView {} = Nothing
-getLifecycles ComponentView {} = Nothing
-getLifecycles SomeView {} = Nothing
-getLifecycles v = Just (lifecycles (features v))
+class HasLifecycles a where
+  getLifecycles :: a -> [Lifecycle]
+  setLifecycles :: [Lifecycle] -> a -> a
+  addLifecycles ::  [Lifecycle] -> a -> a
+  addLifecycles ls a = setLifecycles (getLifecycles a ++ ls) a
 
-{-# INLINE setLifecycles #-}
-setLifecycles _ v@NullView {} = v
-setLifecycles _ v@TextView {} = v
-setLifecycles _ v@ComponentView {} = v
-setLifecycles _ v@SomeView {} = v
-setLifecycles lc v = v { features = (features v) { lifecycles = lc } }
+instance HasLifecycles View where
+  {-# INLINE getLifecycles #-}
+  getLifecycles NullView {} = []
+  getLifecycles TextView {} = []
+  getLifecycles ComponentView {} = []
+  getLifecycles SomeView {} = []
+  getLifecycles v = lifecycles (features v)
+  {-# INLINE setLifecycles #-}
+  setLifecycles _ v@NullView {} = v
+  setLifecycles _ v@TextView {} = v
+  setLifecycles _ v@ComponentView {} = v
+  setLifecycles _ v@SomeView {} = v
+  setLifecycles lc v = v { features = (features v) { lifecycles = lc } }
+  {-# INLINE addLifecycles #-}
+  addLifecycles _ v@NullView {} = v
+  addLifecycles _ v@TextView {} = v
+  addLifecycles _ v@ComponentView {} = v
+  addLifecycles _ v@SomeView {} = v
+  addLifecycles as v = v { features = (features v) { lifecycles = as ++ (lifecycles (features v)) } }
 
-{-# INLINE addLifecycles #-}
-addLifecycles _ v@NullView {} = v
-addLifecycles _ v@TextView {} = v
-addLifecycles _ v@ComponentView {} = v
-addLifecycles _ v@SomeView {} = v
-addLifecycles as v = v { features = (features v) { lifecycles = as ++ (lifecycles (features v)) } }
-
-pattern Lifecycles :: [Lifecycle] -> View -> View
-pattern Lifecycles lc v <- ((getLifecycles &&& id) -> (Just lc,v)) where
+pattern Lifecycles :: HasLifecycles a => [Lifecycle] -> a -> a
+pattern Lifecycles lc v <- ((getLifecycles &&& id) -> (lc,v)) where
   Lifecycles lc v = setLifecycles lc v
 
-pattern AddLifecycles :: [Lifecycle] -> View -> View
-pattern AddLifecycles lc v <- ((getLifecycles &&& id) -> (Just lc,v)) where
+pattern AddLifecycles :: HasLifecycles a => [Lifecycle] -> a -> a
+pattern AddLifecycles lc v <- ((getLifecycles &&& id) -> (lc,v)) where
   AddLifecycles lc v = addLifecycles lc v
 
 -- XLinks
 
-{-# INLINE getXLinks #-}
-getXLinks SVGView {..} = Just (coerceToXLinks (Map.toList xlinks))
-getXLinks KSVGView {..} = Just (coerceToXLinks (Map.toList xlinks))
-getXLinks _ = Nothing
+class HasXLinks a where
+  getXLinks :: a -> [XLink]
+  setXLinks :: [XLink] -> a -> a
+  addXLinks :: [XLink] -> a -> a
+  addXLinks xl a = setXLinks (getXLinks a ++ xl) a
 
-{-# INLINE setXLinks #-}
-setXLinks xl khtml@SVGView {} = khtml { xlinks = Map.fromList (coerceFromXLinks xl) }
-setXLinks xl ksvg@KSVGView {} = ksvg { xlinks = Map.fromList (coerceFromXLinks xl) }
-setXLinks _ v = v
+instance HasXLinks View where
+  {-# INLINE getXLinks #-}
+  getXLinks SVGView {..} = coerceToXLinks (Map.toList xlinks)
+  getXLinks KSVGView {..} = coerceToXLinks (Map.toList xlinks)
+  getXLinks _ = []
+  {-# INLINE setXLinks #-}
+  setXLinks xl khtml@SVGView {} = khtml { xlinks = Map.fromList (coerceFromXLinks xl) }
+  setXLinks xl ksvg@KSVGView {} = ksvg { xlinks = Map.fromList (coerceFromXLinks xl) }
+  setXLinks _ v = v
+  {-# INLINE addXLinks #-}
+  addXLinks xl v@SVGView {} = v { xlinks = Map.union (Map.fromList (coerceFromXLinks xl)) (xlinks v) }
+  addXLinks xl v@KSVGView {} = v { xlinks = Map.union (Map.fromList (coerceFromXLinks xl)) (xlinks v) }
+  addXLinks _ v = v
 
-{-# INLINE addXLinks #-}
-addXLinks xl v@SVGView {} = v { xlinks = Map.union (Map.fromList (coerceFromXLinks xl)) (xlinks v) }
-addXLinks xl v@KSVGView {} = v { xlinks = Map.union (Map.fromList (coerceFromXLinks xl)) (xlinks v) }
-addXLinks _ v = v
-
-pattern XLinks :: [XLink] -> View -> View
-pattern XLinks xl v <- ((getXLinks &&& id) -> (Just xl,v)) where
+pattern XLinks :: HasXLinks a => [XLink] -> a -> a
+pattern XLinks xl v <- ((getXLinks &&& id) -> (xl,v)) where
   XLinks xl v = setXLinks xl v
 
-pattern AddXLinks :: [XLink] -> View -> View
-pattern AddXLinks xl v <- ((getXLinks &&& id) -> (Just xl,v)) where
+pattern AddXLinks :: HasXLinks a => [XLink] -> a -> a
+pattern AddXLinks xl v <- ((getXLinks &&& id) -> (xl,v)) where
   AddXLinks xl v = addXLinks xl v
 
 -- Combinators
+
+class HasChildren a where
+  getChildren :: a -> [View]
+  setChildren :: [View] -> a -> a
+  addChildren :: [View] -> a -> a
+  addChildren cs a = setChildren (getChildren a ++ cs) a
+
+instance HasChildren View where
+  {-# INLINE getChildren #-}
+  getChildren v@HTMLView {} = children v
+  getChildren v@SVGView {} = children v
+  getChildren _  = []
+  {-# INLINE setChildren #-}
+  setChildren cs v@HTMLView {} = v { children = cs }
+  setChildren cs v@SVGView {} = v { children = cs }
+  setChildren _ v = v
+  {-# INLINE addChildren #-}
+  addChildren cs v@HTMLView {} = v { children = children v ++ cs }
+  addChildren cs v@SVGView {} = v { children = children v ++ cs }
+  addChildren _ v = v
+
+pattern Children :: HasChildren a => [View] -> a -> a
+pattern Children cs v <- ((getChildren &&& id) -> (cs,v)) where
+  Children cs v = setChildren cs v
+
+pattern AddChildren :: HasChildren a => [View] -> a -> a
+pattern AddChildren cs v <- ((getChildren &&& id) -> (cs,v)) where
+  AddChildren cs v = addChildren cs v
+
+-- Keyed Children
+
+class HasKeyedChildren a where
+  getKeyedChildren :: a -> [(Int,View)]
+  setKeyedChildren :: [(Int,View)] -> a -> a
+  addKeyedChildren :: [(Int,View)] -> a -> a
+  addKeyedChildren cs a = setKeyedChildren (getKeyedChildren a ++ cs) a
+
+instance HasKeyedChildren View where
+  {-# INLINE getKeyedChildren #-}
+  getKeyedChildren v@KHTMLView {} = keyedChildren v
+  getKeyedChildren v@SVGView {} = keyedChildren v
+  getKeyedChildren _ = []
+  {-# INLINE setKeyedChildren #-}
+  setKeyedChildren cs v@KHTMLView {} = v { keyedChildren = cs }
+  setKeyedChildren cs v@KSVGView {} = v { keyedChildren = cs }
+  setKeyedChildren _ v = v
+  {-# INLINE addKeyedChildren #-}
+  addKeyedChildren cs v@KHTMLView {} = v { keyedChildren = keyedChildren v ++ cs }
+  addKeyedChildren cs v@KSVGView {} = v { keyedChildren = keyedChildren v ++ cs }
+  addKeyedChildren _ v = v
+
+pattern KeyedChildren :: HasKeyedChildren a => [(Int,View)] -> a -> a
+pattern KeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
+  KeyedChildren ks v = setKeyedChildren ks v
+
+pattern AddKeyedChildren :: HasKeyedChildren a => [(Int,View)] -> a -> a
+pattern AddKeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
+  AddKeyedChildren ks v = addKeyedChildren ks v
 
 infixr 0 <|
 {-# INLINE (<|) #-}
@@ -419,20 +514,20 @@ infixr 0 <|
 (<|) = flip ($)
 
 {-# INLINE (<||>) #-}
-(<||>) :: View -> [View] -> View
+(<||>) :: HasChildren a => a -> [View] -> a
 (<||>) v cs = Children cs v
 
 {-# INLINE (<|#|>) #-}
-(<|#|>) :: View -> [(Int,View)] -> View
+(<|#|>) :: HasKeyedChildren a => a -> [(Int,View)] -> a
 (<|#|>) v cs = KeyedChildren cs v
 
 infixl 1 |>
 {-# INLINE (|>) #-}
-(|>) :: (View -> c) -> [View] -> View -> c
-(|>) f cs = f . flip setChildren cs
+(|>) :: HasChildren a => (a -> c) -> [View] -> a -> c
+(|>) f cs = f . setChildren cs
 
 infixl 1 |#>
 {-# INLINE (|#>) #-}
-(|#>) :: (View -> c) -> [(Int,View)] -> View -> c
-(|#>) f cs = f . flip setKeyedChildren cs
+(|#>) :: HasKeyedChildren a => (a -> c) -> [(Int,View)] -> a -> c
+(|#>) f cs = f . setKeyedChildren cs
 
