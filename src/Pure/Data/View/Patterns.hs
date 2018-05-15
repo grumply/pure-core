@@ -515,7 +515,7 @@ instance HasLifecycles Features where
   {-# INLINE setLifecycles #-}
   setLifecycles ls fs = fs { lifecycles = ls }
   {-# INLINE addLifecycles #-}
-  addLifecycles ls fs = fs { lifecycles = as ++ lifecycles fs }
+  addLifecycles ls fs = fs { lifecycles = ls ++ lifecycles fs }
 
 pattern Lifecycles :: HasLifecycles a => [Lifecycle] -> a -> a
 pattern Lifecycles lc v <- ((getLifecycles &&& id) -> (lc,v)) where
