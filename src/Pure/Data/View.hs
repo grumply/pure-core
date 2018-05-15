@@ -6,6 +6,7 @@ import Control.Concurrent (MVar)
 import Control.Monad.ST (ST)
 import Data.Coerce (Coercible(),coerce)
 import Data.IORef (IORef)
+import Data.Monoid (Monoid(..))
 import Data.Proxy (Proxy(..))
 import Data.STRef (STRef)
 import Data.String (IsString(..))
@@ -159,6 +160,12 @@ data Features =
        , listeners  :: [Listener]
        , lifecycles :: [Lifecycle]
        }
+
+instance Monoid Features where
+  mempty = Features mempty mempty mempty mempty mempty mempty
+  mappend (Features c1 s1 a1 p1 ls1 lc1) (Features c2 s2 a2 p2 ls2 lc2) =
+    -- NOTE: mappending prefers the styles, attributes, and properties on the right
+    Features (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
 
 data View where
   -- NullView must have a presence on the page for proper diffing
