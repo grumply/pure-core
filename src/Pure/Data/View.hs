@@ -167,6 +167,9 @@ instance Monoid Features where
     -- NOTE: mappending prefers the styles, attributes, and properties on the right
     Features (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
 
+instance Default Features where
+  def = mempty
+
 data View where
   -- NullView must have a presence on the page for proper diffing
   NullView ::
