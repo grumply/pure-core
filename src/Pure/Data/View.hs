@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, GADTs #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, GADTs, FlexibleInstances, UndecidableInstances #-}
 module Pure.Data.View where
 
 -- base
@@ -243,6 +243,15 @@ instance Pure View where
 
 tyCon :: Typeable t => t -> String
 tyCon = tyConName . typeRepTyCon . typeOf
+
+class ToView a where
+  toView :: a -> View
+
+instance ToView View where
+  toView = id
+
+instance (Pure a, Typeable a) => ToView a where
+  toView = View
 
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where

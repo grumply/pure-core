@@ -8,7 +8,7 @@ module Pure.Data.View.Patterns
   , Attribute(..)
   , SVGAttribute(..)
   , XLink(..)
-  , pattern Component
+  , pattern LibraryComponent, pattern Component
   , pattern Null
   , pattern Raw
   , pattern Keyed
@@ -93,6 +93,10 @@ pattern EmptyList <- (List.null -> True) where
   EmptyList = []
 
 -- Component
+
+pattern LibraryComponent :: forall m props state. Typeable props => (Ref m props state -> Comp m props state) -> props -> View
+pattern LibraryComponent v p <- ComponentView ((== (show (typeOf (undefined :: props)))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
+  LibraryComponent v p = ComponentView (show (typeOf p)) p Nothing v
 
 pattern Component :: forall m props state. Typeable props => (Ref m props state -> Comp m props state) -> props -> View
 pattern Component v p <- ComponentView ((==) (tyCon (undefined :: props)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
@@ -510,8 +514,8 @@ pattern AddKeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
 
 infixr 0 <|
 {-# INLINE (<|) #-}
-(<|) :: a -> (a -> b) -> b
-(<|) = flip ($)
+(<|) :: ToView b => a -> (a -> b) -> View
+(<|) a f = toView (f a)
 
 {-# INLINE (<||>) #-}
 (<||>) :: HasChildren a => a -> [View] -> a
