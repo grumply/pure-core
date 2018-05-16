@@ -152,7 +152,7 @@ data Ref m props state
       }
 
 data Features =
-  Features
+  Features_
        { classes    :: Set Txt
        , styles     :: Map Txt Txt
        , attributes :: Map Txt Txt
@@ -162,10 +162,10 @@ data Features =
        }
 
 instance Monoid Features where
-  mempty = Features mempty mempty mempty mempty mempty mempty
-  mappend (Features c1 s1 a1 p1 ls1 lc1) (Features c2 s2 a2 p2 ls2 lc2) =
+  mempty = Features_ mempty mempty mempty mempty mempty mempty
+  mappend (Features_ c1 s1 a1 p1 ls1 lc1) (Features_ c2 s2 a2 p2 ls2 lc2) =
     -- NOTE: mappending prefers the styles, attributes, and properties on the right
-    Features (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
+    Features_ (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
 
 instance Default Features where
   def = mempty
@@ -257,11 +257,11 @@ tyCon = tyConName . typeRepTyCon . typeOf
 class ToView a where
   toView :: a -> View
 
-instance ToView View where
-  toView = id
-
-instance (Pure a, Typeable a) => ToView a where
+instance {-# OVERLAPPABLE #-} (Typeable a, Pure a) => ToView a where
   toView = View
+
+instance {-# OVERLAPS #-}ToView View where
+  toView = id
 
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
