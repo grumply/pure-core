@@ -17,16 +17,13 @@ library
     pure-default >= 0.7 && < 1,
     pure-json >= 0.7 && < 1,
     pure-txt >= 0.7 && < 1,
-    pure-queue >= 0.7 && < 1
+    pure-queue >= 0.7 && < 1,
+    pure-lifted >= 0.7 && < 1
 
   hs-source-dirs: src
 
   exposed-modules:
     Pure.Data.View
     Pure.Data.View.Patterns
-
-  if (impl(ghcjs))
-    build-depends:
-      ghcjs-base >= 0.2 && < 0.3
 
   default-language: Haskell2010

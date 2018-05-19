@@ -2,6 +2,7 @@
 module Pure.Data.View.Patterns
   ( pattern SimpleHTML
   , pattern SimpleSVG
+  , pattern Portal
   , pattern LibraryComponent, pattern Component
   , pattern LibraryComponentIO, pattern ComponentIO
   , pattern Null
@@ -12,11 +13,14 @@ module Pure.Data.View.Patterns
   , pattern Style, pattern Styles, pattern AddStyles
   , pattern Property, pattern Properties, pattern AddProperties
   , pattern Attribute, pattern Attributes, pattern AddAttributes
+  , pattern Lifecycle, pattern Lifecycles, pattern AddLifecycles
+  , pattern Listener, pattern Listeners, pattern AddListeners
   , HasXLinks(..), pattern XLink, pattern XLinks, pattern AddXLinks
   , HasChildren(..), pattern Children, pattern AddChildren
   , HasKeyedChildren(..), pattern KeyedChildren, pattern AddKeyedChildren
   , (<|), (<||>), (|>)
-  , (<|#|>), (|#>)
+  , (<||#>), (|#>)
+  , addProperty
   ) where
 
 -- This module exposes some hacky patterns due to GHCs lack of unidirectional expression patterns.
@@ -29,7 +33,10 @@ import Pure.Data.Default (Default(..))
 -- from pure-core (local)
 import Pure.Data.View
 
--- from pure-txgt
+-- from pure-lifted
+import Pure.Data.Lifted (Element)
+
+-- from pure-txt
 import Pure.Data.Txt (Txt)
 
 -- from base
@@ -39,8 +46,8 @@ import Data.Coerce (coerce)
 import Data.Monoid ((<>))
 import Data.Typeable (Typeable,TypeRep(),typeOf)
 import Data.List as List (null)
-import Data.Map.Strict as Map (fromList,null,empty,union,toList,insert)
-import Data.IntMap.Strict as IntMap (empty)
+import Data.Map.Lazy as Map (fromList,null,empty,union,toList,insert)
+import Data.IntMap.Lazy as IntMap (empty)
 import Data.Set as Set (Set,fromList,null,empty,union,toList,insert)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -96,6 +103,7 @@ toRaw HTMLView {..} = RawView { content = "", .. }
 toRaw SVGView {..} = RawView { content = "", .. }
 toRaw KHTMLView {..} = RawView { content = "", .. }
 toRaw KSVGView {..} = RawView { content = "", .. }
+toRaw PortalView {..} = PortalView { portalView = toRaw portalView, .. }
 toRaw v = v
 
 setContent :: Txt -> View -> View
@@ -107,16 +115,23 @@ pattern Raw :: View -> Txt -> View
 pattern Raw v r <- ((id &&& id) -> (RawView _ _ _ r,v)) where
   Raw v r = setContent r (toRaw v)
 
+-- Portal
+
+pattern Portal :: Element -> View -> View
+pattern Portal host v = PortalView host v
+
 -- Keyed
 
 isKeyed :: View -> Bool
 isKeyed KSVGView{} = True
 isKeyed KHTMLView{} = True
+isKeyed PortalView{..} = isKeyed portalView
 isKeyed _ = False
 
 keyed :: View -> View
 keyed SVGView {..} = KSVGView { keyedChildren = [], childMap = IntMap.empty, .. }
 keyed HTMLView {..} = KHTMLView { keyedChildren = [], childMap = IntMap.empty, .. }
+keyed PortalView {..} = PortalView { portalView = keyed portalView, .. }
 keyed v = v
 
 pattern Keyed :: View -> View
@@ -129,29 +144,25 @@ class HasFeatures a where
   getFeatures :: a -> Features
   setFeatures :: Features -> a -> a
   addFeatures :: Features -> a -> a
-  {-# INLINE addFeatures #-}
   addFeatures fs a = setFeatures (getFeatures a <> fs) a
 
 instance HasFeatures View where
-  {-# INLINE getFeatures #-}
   getFeatures NullView {} = mempty
   getFeatures TextView {} = mempty
   getFeatures ComponentView {} = mempty
   getFeatures SomeView {} = mempty
+  getFeatures PortalView{..} = getFeatures portalView
   getFeatures v = features v
-  {-# INLINE setFeatures #-}
   setFeatures _ v@NullView {} = v
   setFeatures _ v@TextView {} = v
   setFeatures _ v@ComponentView {} = v
   setFeatures _ v@SomeView {} = v
+  setFeatures fs v@PortalView{..} = PortalView { portalView = setFeatures fs portalView, .. }
   setFeatures fs v = v { features = fs }
 
 instance HasFeatures Features where
-  {-# INLINE getFeatures #-}
   getFeatures = id
-  {-# INLINE setFeatures #-}
   setFeatures = const
-  {-# INLINE addFeatures #-}
   addFeatures = (<>)
 
 pattern Features :: HasFeatures a => Features -> a -> a
@@ -168,11 +179,15 @@ pattern Class :: HasFeatures a => Txt -> a -> a
 pattern Class c a <- ((const "" &&& id) -> (c,a)) where
   Class c a =
     let fs = getFeatures a
-    in setFeatures (fs { classes = Set.insert c (classes fs) }) a
+        ~cs = Set.insert c (classes fs)
+    in setFeatures fs { classes = cs } a
 
 pattern Classes :: HasFeatures a => [Txt] -> a -> a
 pattern Classes cs a <- (((Set.toList . classes . getFeatures) &&& id) -> (cs,a)) where
-  Classes cs a = setFeatures ((getFeatures a) { classes = Set.fromList cs }) a
+  Classes cs a =
+    let cs' = foldr Set.insert Set.empty cs
+        fs  = getFeatures a
+    in setFeatures fs { classes = cs' } a
 
 pattern AddClasses :: HasFeatures a => [Txt] -> a -> a
 pattern AddClasses cs a <- Classes cs a where
@@ -240,11 +255,22 @@ pattern Property :: HasFeatures a => (Txt,Txt) -> a -> a
 pattern Property kv a <- ((const ("","") &&& id) -> (kv,a)) where
   Property (k,v) a =
     let fs = getFeatures a
-    in setFeatures (fs { properties = Map.insert k v (properties fs) }) a
+        ps = properties fs
+        ~ps' = Map.insert k v ps
+    in setFeatures fs { properties = ps' } a
+
+addProperty :: (Txt,Txt) -> Features -> Features
+addProperty (k,v) fs =
+  let ps = properties fs
+      ps' = Map.insert k v ps
+  in fs { properties = ps' }
 
 pattern Properties :: HasFeatures a => [(Txt,Txt)] -> a -> a
 pattern Properties ps v <- (((Map.toList . properties . getFeatures) &&& id) -> (ps,v)) where
-  Properties ps v = setFeatures ((getFeatures v) { properties = Map.fromList ps }) v
+  Properties ps v =
+    let fs = getFeatures v
+        ~ps' = foldr (\(k,v) -> Map.insert k v) Map.empty ps
+    in setFeatures fs { properties = ps' } v
 
 pattern AddProperties :: HasFeatures a => [(Txt,Txt)] -> a -> a
 pattern AddProperties ps v <- Properties ps v where
@@ -276,21 +302,20 @@ class HasXLinks a where
   getXLinks :: a -> [(Txt,Txt)]
   setXLinks :: [(Txt,Txt)] -> a -> a
   addXLinks :: [(Txt,Txt)] -> a -> a
-  {-# INLINE addXLinks #-}
   addXLinks xl a = setXLinks (getXLinks a ++ xl) a
 
 instance HasXLinks View where
-  {-# INLINE getXLinks #-}
   getXLinks SVGView {..} = Map.toList xlinks
   getXLinks KSVGView {..} = Map.toList xlinks
+  getXLinks PortalView {..} = getXLinks portalView
   getXLinks _ = []
-  {-# INLINE setXLinks #-}
   setXLinks xl khtml@SVGView {} = khtml { xlinks = Map.fromList xl }
   setXLinks xl ksvg@KSVGView {} = ksvg { xlinks = Map.fromList xl }
+  setXLinks xl PortalView {..}  = PortalView { portalView = setXLinks xl portalView, .. }
   setXLinks _ v = v
-  {-# INLINE addXLinks #-}
   addXLinks xl v@SVGView {} = v { xlinks = Map.union (Map.fromList xl) (xlinks v) }
   addXLinks xl v@KSVGView {} = v { xlinks = Map.union (Map.fromList xl) (xlinks v) }
+  addXLinks xl PortalView {..} = PortalView { portalView = addXLinks xl portalView, .. }
   addXLinks _ v = v
 
 pattern XLink :: HasXLinks a => (Txt,Txt) -> a -> a
@@ -313,21 +338,20 @@ class HasChildren a where
   getChildren :: a -> [View]
   setChildren :: [View] -> a -> a
   addChildren :: [View] -> a -> a
-  {-# INLINE addChildren #-}
   addChildren cs a = setChildren (getChildren a ++ cs) a
 
 instance HasChildren View where
-  {-# INLINE getChildren #-}
   getChildren v@HTMLView {} = children v
   getChildren v@SVGView {} = children v
+  getChildren PortalView {..} = getChildren portalView
   getChildren _  = []
-  {-# INLINE setChildren #-}
   setChildren cs v@HTMLView {} = v { children = cs }
   setChildren cs v@SVGView {} = v { children = cs }
+  setChildren cs PortalView {..} = PortalView { portalView = setChildren cs portalView, .. }
   setChildren _ v = v
-  {-# INLINE addChildren #-}
   addChildren cs v@HTMLView {} = v { children = children v ++ cs }
   addChildren cs v@SVGView {} = v { children = children v ++ cs }
+  addChildren cs PortalView {..} = PortalView { portalView = setChildren cs portalView, .. }
   addChildren _ v = v
 
 pattern Children :: HasChildren a => [View] -> a -> a
@@ -344,21 +368,20 @@ class HasKeyedChildren a where
   getKeyedChildren :: a -> [(Int,View)]
   setKeyedChildren :: [(Int,View)] -> a -> a
   addKeyedChildren :: [(Int,View)] -> a -> a
-  {-# INLINE addKeyedChildren #-}
   addKeyedChildren cs a = setKeyedChildren (getKeyedChildren a ++ cs) a
 
 instance HasKeyedChildren View where
-  {-# INLINE getKeyedChildren #-}
   getKeyedChildren v@KHTMLView {} = keyedChildren v
   getKeyedChildren v@SVGView {} = keyedChildren v
+  getKeyedChildren PortalView {..} = getKeyedChildren portalView
   getKeyedChildren _ = []
-  {-# INLINE setKeyedChildren #-}
   setKeyedChildren cs v@KHTMLView {} = v { keyedChildren = cs }
   setKeyedChildren cs v@KSVGView {} = v { keyedChildren = cs }
+  setKeyedChildren cs PortalView {..} = PortalView { portalView = setKeyedChildren cs portalView, .. }
   setKeyedChildren _ v = v
-  {-# INLINE addKeyedChildren #-}
   addKeyedChildren cs v@KHTMLView {} = v { keyedChildren = keyedChildren v ++ cs }
   addKeyedChildren cs v@KSVGView {} = v { keyedChildren = keyedChildren v ++ cs }
+  addKeyedChildren cs PortalView {..} = PortalView { portalView = setKeyedChildren cs portalView, .. }
   addKeyedChildren _ v = v
 
 pattern KeyedChildren :: HasKeyedChildren a => [(Int,View)] -> a -> a
@@ -370,25 +393,22 @@ pattern AddKeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
   AddKeyedChildren ks v = addKeyedChildren ks v
 
 infixl 0 <|
-{-# INLINE (<|) #-}
 (<|) :: ToView b => a -> (a -> b) -> View
-(<|) a f = toView (f a)
+(<|) a f =
+  let b = f a
+  in toView b
 
-{-# INLINE (<||>) #-}
-(<||>) :: HasChildren a => a -> [View] -> a
-(<||>) v cs = Children cs v
+(<||>) :: (ToView a, HasChildren a) => a -> [View] -> View
+(<||>) v cs = toView (Children cs v)
 
-{-# INLINE (<|#|>) #-}
-(<|#|>) :: HasKeyedChildren a => a -> [(Int,View)] -> a
-(<|#|>) v cs = KeyedChildren cs v
+(<||#>) :: (ToView a, HasKeyedChildren a) => a -> [(Int,View)] -> View
+(<||#>) v cs = toView (KeyedChildren cs v)
 
 infixr 9 |>
-{-# INLINE (|>) #-}
 (|>) :: HasChildren a => (a -> c) -> [View] -> a -> c
 (|>) f cs = f . setChildren cs
 
 infixr 9 |#>
-{-# INLINE (|#>) #-}
 (|#>) :: HasKeyedChildren a => (a -> c) -> [(Int,View)] -> a -> c
 (|#>) f cs = f . setKeyedChildren cs
 

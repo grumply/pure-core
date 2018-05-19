@@ -1,87 +1,41 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, GADTs, FlexibleInstances, UndecidableInstances #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, GADTs, FlexibleInstances, UndecidableInstances, RecordWildCards #-}
 module Pure.Data.View where
 
--- base
+-- from base
 import Control.Concurrent (MVar)
+import Control.Monad (void,join)
 import Control.Monad.ST (ST)
 import Data.Coerce (Coercible(),coerce)
-import Data.IORef (IORef)
+import Data.IORef (IORef,readIORef)
 import Data.Monoid (Monoid(..),(<>))
 import Data.Proxy (Proxy(..))
 import Data.STRef (STRef)
 import Data.String (IsString(..))
+import Data.Traversable (for)
 import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf)
 import GHC.Generics (Generic(..))
+import System.IO.Unsafe (unsafePerformIO)
 import Unsafe.Coerce (unsafeCoerce)
 
--- containers
-import Data.IntMap.Strict (IntMap)
-import Data.Map.Strict (Map)
+-- from containers
+import Data.IntMap.Lazy (IntMap)
+import Data.Map.Lazy (Map)
 import Data.Set (Set)
 
--- pure-default
+-- from pure-default
 import Pure.Data.Default (Default(..))
 
--- pure-json
+-- from pure-json
 import Pure.Data.JSON (ToJSON,FromJSON)
 
--- pure-txt
+-- from pure-txt
 import Pure.Data.Txt (FromTxt(..),ToTxt(..),Txt)
 
--- pure-queue
-import Pure.Data.Queue (Queue)
+-- from pure-queue
+import Pure.Data.Queue (Queue,arrive)
 
--- from ghcjs-base
-#ifdef __GHCJS__
-import GHCJS.Marshal.Pure
-import GHCJS.Types
-
-type JSV = JSVal
-#else
-type JSV = ()
-#endif
-
-newtype Win     = Win JSV
-newtype Doc     = Doc JSV
-newtype Head    = Head JSV
-newtype Body    = Body JSV
-newtype Element = Element JSV
-newtype Text    = Text JSV
-newtype Node    = Node JSV
-newtype Frag    = Frag JSV
-
-newtype History = History JSV
-newtype Loc     = Loc JSV
-
-toJSV :: Coercible a JSV => a -> JSV
-toJSV = coerce
-
-class IsNode e where
-  toNode :: e -> Node
-  default toNode :: Coercible e Node => e -> Node
-  toNode = coerce
-instance IsNode Node where
-  toNode = id
-instance IsNode Body
-instance IsNode Head
-instance IsNode Element
-instance IsNode Text
-instance IsNode Frag
-instance IsNode Doc
-
-data Options = Options
-  { preventDef :: Bool
-  , stopProp   :: Bool
-  , passive    :: Bool
-  } deriving (Eq,Show)
-instance Default Options where
-  def = Options False False True
-
-data Evt = Evt
-  { evtObj            :: JSV
-  , evtTarget         :: JSV
-  , evtRemoveListener :: IO ()
-  }
+-- from pure-lifted
+import Pure.Data.Lifted (Evt,Element,Node,IsNode(..),Text,Options)
 
 data Target = ElementTarget | WindowTarget | DocumentTarget deriving Eq
 
@@ -137,7 +91,7 @@ instance Monad m => Default (Comp m props state) where
       }
 
 data ComponentPatch m props state
-  = forall s. Unmount (STRef s [IO ()] -> View -> ST s ()) (MVar (IO ()))
+  = forall s. Unmount (STRef s [IO ()] -> STRef s [IO ()] -> View -> ST s ()) (MVar (IO ()))
   | UpdateProperties props
   | UpdateState (props -> state -> m (state,m ()))
 
@@ -147,7 +101,7 @@ data Ref m props state
       , crView       :: (IORef View)
       , crProps      :: (IORef props)
       , crState      :: (IORef state)
-      , crComponent  :: Comp m props state
+      , crComponent  :: (Comp m props state)
       , crPatchQueue :: (IORef (Maybe (Queue (ComponentPatch m props state))))
       }
 
@@ -173,67 +127,69 @@ instance Default Features where
 data View where
   -- NullView must have a presence on the page for proper diffing
   NullView ::
-        { elementHost :: Maybe Element
+        { elementHost :: (Maybe Element)
         } -> View
 
   TextView ::
-        { textHost :: Maybe Text
+        { textHost :: (Maybe Text)
         , content  :: Txt
         } -> View
 
   RawView ::
-       { elementHost:: Maybe Element
+       { elementHost:: (Maybe Element)
        , tag        :: Txt
        , features   :: Features
        , content    :: Txt
        } -> View
 
   HTMLView ::
-       { elementHost :: Maybe Element
+       { elementHost :: (Maybe Element)
        , tag         :: Txt
        , features    :: Features
        , children    :: [View]
        } -> View
 
   KHTMLView ::
-       { elementHost   :: Maybe Element
+       { elementHost   :: (Maybe Element)
        , tag           :: Txt
        , features      :: Features
        , keyedChildren :: [(Int,View)]
-       , childMap      :: IntMap View
+       , childMap      :: (IntMap View)
        } -> View
 
   ComponentView ::
        { name   :: String
        , props  :: props
-       , record :: Maybe (Ref m props state)
-       , comp   :: Ref m props state -> Comp m props state
+       , record :: (Maybe (Ref m props state))
+       , comp   :: (Ref m props state -> Comp m props state)
        } -> View
 
   SVGView ::
-       { elementHost :: Maybe Element
+       { elementHost :: (Maybe Element)
        , tag         :: Txt
        , features    :: Features
-       , xlinks      :: Map Txt Txt
+       , xlinks      :: (Map Txt Txt)
        , children    :: [View]
        } -> View
 
   KSVGView ::
-       { elementHost   :: Maybe Element
+       { elementHost   :: (Maybe Element)
        , tag           :: Txt
        , features      :: Features
-       , xlinks        :: Map Txt Txt
+       , xlinks        :: (Map Txt Txt)
        , keyedChildren :: [(Int,View)]
-       , childMap      :: IntMap View
+       , childMap      :: (IntMap View)
        } -> View
 
   SomeView :: Pure a =>
-       { name       :: String -- Typeable is too expensive here because of the weight of m
+       { name       :: String
        , renderable :: a
        } -> View
 
-  -- StaticView
-  --   :: { staticView :: View ms } -> View ms
+  PortalView ::
+      { portalDestination :: Element
+      , portalView :: View
+      } -> View
 
 instance Default View where
   def = NullView Nothing
@@ -267,7 +223,44 @@ pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
   View a = SomeView (tyCon (undefined :: a)) a
 
-type Plan s = STRef s [IO ()]
-type DiffIO   a = a -> a -> a -> IO   a
-type DiffST s a = a -> a -> a -> ST s a
+getState :: Ref m props state -> IO state
+getState = readIORef . crState
 
+getProps :: Ref m props state -> IO props
+getProps = readIORef . crProps
+
+getView :: Ref m props state -> IO View
+getView = readIORef . crView
+
+-- TODO: consider optimizing for this case?
+setStatePure :: Monad m => Ref m props state -> (props -> state -> state) -> IO Bool
+setStatePure r f = setState r (\p s -> return (f p s,return ()))
+
+setStatePure_ :: Monad m => Ref m props state -> (props -> state -> state) -> IO ()
+setStatePure_ r f = void (setStatePure r f)
+
+setState :: Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
+setState cr = queueComponentUpdate cr . UpdateState
+
+setState_ :: Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
+setState_ r f = void (setState r f)
+
+setProps :: Ref m props state -> props -> IO Bool
+setProps cr = queueComponentUpdate cr . UpdateProperties
+
+queueComponentUpdate :: Ref m props state -> ComponentPatch m props state -> IO Bool
+queueComponentUpdate crec cp = do
+  mq <- readIORef (crPatchQueue crec)
+  case mq of
+    Nothing -> return False
+    Just q  -> do
+      arrive q cp
+      return True
+
+getHost :: View -> Maybe Node
+-- EEK
+getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . readIORef . crView)
+getHost TextView  {..} = fmap toNode textHost
+getHost SomeView {}    = Nothing
+getHost PortalView {..} = getHost portalView
+getHost x              = fmap toNode $ elementHost x
