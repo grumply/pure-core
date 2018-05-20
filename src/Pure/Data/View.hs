@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, GADTs, FlexibleInstances, UndecidableInstances, RecordWildCards #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns #-}
 module Pure.Data.View where
 
 -- from base
@@ -18,8 +18,8 @@ import System.IO.Unsafe (unsafePerformIO)
 import Unsafe.Coerce (unsafeCoerce)
 
 -- from containers
-import Data.IntMap.Lazy (IntMap)
-import Data.Map.Lazy (Map)
+import Data.IntMap.Strict (IntMap)
+import Data.Map.Strict (Map)
 import Data.Set (Set)
 
 -- from pure-default
@@ -107,10 +107,10 @@ data Ref m props state
 
 data Features =
   Features_
-       { classes    :: Set Txt
-       , styles     :: Map Txt Txt
-       , attributes :: Map Txt Txt
-       , properties :: Map Txt Txt
+       { classes    :: (Set Txt)
+       , styles     :: (Map Txt Txt)
+       , attributes :: (Map Txt Txt)
+       , properties :: (Map Txt Txt)
        , listeners  :: [Listener]
        , lifecycles :: [Lifecycle]
        }
@@ -124,81 +124,86 @@ instance Monoid Features where
 instance Default Features where
   def = mempty
 
-data View where
-  -- NullView must have a presence on the page for proper diffing
-  NullView ::
+data View
+  = NullView
         { elementHost :: (Maybe Element)
-        } -> View
+        }
 
-  TextView ::
+  | TextView
         { textHost :: (Maybe Text)
         , content  :: Txt
-        } -> View
+        }
 
-  RawView ::
+  | RawView
        { elementHost:: (Maybe Element)
        , tag        :: Txt
        , features   :: Features
        , content    :: Txt
-       } -> View
+       }
 
-  HTMLView ::
+  | HTMLView
        { elementHost :: (Maybe Element)
        , tag         :: Txt
        , features    :: Features
        , children    :: [View]
-       } -> View
+       }
 
-  KHTMLView ::
+  | KHTMLView
        { elementHost   :: (Maybe Element)
        , tag           :: Txt
        , features      :: Features
        , keyedChildren :: [(Int,View)]
        , childMap      :: (IntMap View)
-       } -> View
+       }
 
-  ComponentView ::
+  | forall m props state. ComponentView
        { name   :: String
        , props  :: props
        , record :: (Maybe (Ref m props state))
        , comp   :: (Ref m props state -> Comp m props state)
-       } -> View
+       }
 
-  SVGView ::
+  | SVGView
        { elementHost :: (Maybe Element)
        , tag         :: Txt
        , features    :: Features
        , xlinks      :: (Map Txt Txt)
        , children    :: [View]
-       } -> View
+       }
 
-  KSVGView ::
+  | KSVGView
        { elementHost   :: (Maybe Element)
        , tag           :: Txt
        , features      :: Features
        , xlinks        :: (Map Txt Txt)
        , keyedChildren :: [(Int,View)]
        , childMap      :: (IntMap View)
-       } -> View
+       }
 
-  SomeView :: Pure a =>
+  | forall a. Pure a => SomeView
        { name       :: String
        , renderable :: a
-       } -> View
+       }
 
-  PortalView ::
+  | PortalView
       { portalDestination :: Element
       , portalView :: View
-      } -> View
+      }
 
 instance Default View where
   def = NullView Nothing
 
 instance IsString View where
-  fromString = TextView Nothing . fromString
+  fromString s = fromTxt $ fromString s
+
+instance IsString [View] where
+  fromString s = [ fromString s ]
 
 instance FromTxt View where
-  fromTxt = TextView Nothing
+  fromTxt t = TextView Nothing t
+
+instance FromTxt [View] where
+  fromTxt t = [ fromTxt t ]
 
 class Pure a where
   view :: a -> View
@@ -207,6 +212,7 @@ instance Pure View where
   view (SomeView _ a) = view a
   view a = a
 
+{-# INLINE tyCon #-}
 tyCon :: Typeable t => t -> String
 tyCon = tyConName . typeRepTyCon . typeOf
 
@@ -223,31 +229,39 @@ pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
   View a = SomeView (tyCon (undefined :: a)) a
 
+{-# INLINE getState #-}
 getState :: Ref m props state -> IO state
 getState = readIORef . crState
 
+{-# INLINE getProps #-}
 getProps :: Ref m props state -> IO props
 getProps = readIORef . crProps
 
+{-# INLINE getView #-}
 getView :: Ref m props state -> IO View
 getView = readIORef . crView
 
--- TODO: consider optimizing for this case?
+{-# INLINE setStatePure #-}-- TODO: consider optimizing for this case?
 setStatePure :: Monad m => Ref m props state -> (props -> state -> state) -> IO Bool
 setStatePure r f = setState r (\p s -> return (f p s,return ()))
 
+{-# INLINE setStatePure_ #-}
 setStatePure_ :: Monad m => Ref m props state -> (props -> state -> state) -> IO ()
 setStatePure_ r f = void (setStatePure r f)
 
+{-# INLINE setState #-}
 setState :: Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
 setState cr = queueComponentUpdate cr . UpdateState
 
+{-# INLINE setState_ #-}
 setState_ :: Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
 setState_ r f = void (setState r f)
 
+{-# INLINE setProps #-}
 setProps :: Ref m props state -> props -> IO Bool
 setProps cr = queueComponentUpdate cr . UpdateProperties
 
+{-# INLINE queueComponentUpdate #-}
 queueComponentUpdate :: Ref m props state -> ComponentPatch m props state -> IO Bool
 queueComponentUpdate crec cp = do
   mq <- readIORef (crPatchQueue crec)
@@ -257,6 +271,7 @@ queueComponentUpdate crec cp = do
       arrive q cp
       return True
 
+{-# INLINE getHost #-}
 getHost :: View -> Maybe Node
 -- EEK
 getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . readIORef . crView)
