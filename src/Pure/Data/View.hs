@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs #-}
 module Pure.Data.View where
 
 -- from base
@@ -17,11 +17,6 @@ import GHC.Generics (Generic(..))
 import System.IO.Unsafe (unsafePerformIO)
 import Unsafe.Coerce (unsafeCoerce)
 
--- from containers
-import Data.IntMap.Strict (IntMap)
-import Data.Map.Strict (Map)
-import Data.Set (Set)
-
 -- from pure-default
 import Pure.Data.Default (Default(..))
 
@@ -36,6 +31,10 @@ import Pure.Data.Queue (Queue,arrive)
 
 -- from pure-lifted
 import Pure.Data.Lifted (Evt,Element,Node,IsNode(..),Text,Options)
+
+-- from unordered-containers
+import Data.Set (Set)
+import Data.Map.Lazy (Map)
 
 data Target = ElementTarget | WindowTarget | DocumentTarget deriving Eq
 
@@ -74,8 +73,8 @@ data Comp (m :: * -> *) props state = Monad m =>
 instance Monad m => Default (Comp m props state) where
   def =
     Comp
-      { performIO   = error "Component.performIO: no lifter specified"
-      , execute     = error "Component.execute: no executor specified"
+      { performIO   = unsafeCoerce id
+      , execute     = unsafeCoerce id
       , construct   = return (error "Component.construct: no initial state.")
       , initialize  = return
       , initialized = return ()
@@ -91,26 +90,26 @@ instance Monad m => Default (Comp m props state) where
       }
 
 data ComponentPatch m props state
-  = forall s. Unmount (STRef s [IO ()] -> STRef s [IO ()] -> View -> ST s ()) (MVar (IO ()))
+  = Unmount (Maybe View) (IO ())
   | UpdateProperties props
   | UpdateState (props -> state -> m (state,m ()))
 
 data Ref m props state
   = Ref
       { crType       :: String
-      , crView       :: (IORef View)
-      , crProps      :: (IORef props)
-      , crState      :: (IORef state)
-      , crComponent  :: (Comp m props state)
-      , crPatchQueue :: (IORef (Maybe (Queue (ComponentPatch m props state))))
+      , crView       :: IORef View
+      , crProps      :: IORef props
+      , crState      :: IORef state
+      , crComponent  :: Comp m props state
+      , crPatchQueue :: IORef (Maybe (Queue (ComponentPatch m props state)))
       }
 
 data Features =
   Features_
-       { classes    :: (Set Txt)
-       , styles     :: (Map Txt Txt)
-       , attributes :: (Map Txt Txt)
-       , properties :: (Map Txt Txt)
+       { classes    :: Set Txt
+       , styles     :: Map Txt Txt
+       , attributes :: Map Txt Txt
+       , properties :: Map Txt Txt
        , listeners  :: [Listener]
        , lifecycles :: [Lifecycle]
        }
@@ -124,71 +123,69 @@ instance Monoid Features where
 instance Default Features where
   def = mempty
 
-data View
-  = NullView
-        { elementHost :: (Maybe Element)
-        }
+data View where
+  NullView ::
+        { elementHost :: Maybe Element
+        } -> View
 
-  | TextView
-        { textHost :: (Maybe Text)
+  TextView ::
+        { textHost :: Maybe Text
         , content  :: Txt
-        }
+        } -> View
 
-  | RawView
-       { elementHost:: (Maybe Element)
+  RawView ::
+       { elementHost:: Maybe Element
        , tag        :: Txt
        , features   :: Features
        , content    :: Txt
-       }
+       } -> View
 
-  | HTMLView
-       { elementHost :: (Maybe Element)
+  HTMLView ::
+       { elementHost :: Maybe Element
        , tag         :: Txt
        , features    :: Features
-       , children    :: [View]
-       }
+       , children    :: ![View]
+       } -> View
 
-  | KHTMLView
-       { elementHost   :: (Maybe Element)
+  KHTMLView ::
+       { elementHost   :: Maybe Element
        , tag           :: Txt
        , features      :: Features
        , keyedChildren :: [(Int,View)]
-       , childMap      :: (IntMap View)
-       }
+       } -> View
 
-  | forall m props state. ComponentView
+  ComponentView ::
        { name   :: String
        , props  :: props
-       , record :: (Maybe (Ref m props state))
-       , comp   :: (Ref m props state -> Comp m props state)
-       }
+       , record :: Maybe (Ref m props state)
+       , comp   :: Ref m props state -> Comp m props state
+       } -> View
 
-  | SVGView
-       { elementHost :: (Maybe Element)
+  SVGView ::
+       { elementHost :: Maybe Element
        , tag         :: Txt
        , features    :: Features
-       , xlinks      :: (Map Txt Txt)
+       , xlinks      :: Map Txt Txt
        , children    :: [View]
-       }
+       } -> View
 
-  | KSVGView
-       { elementHost   :: (Maybe Element)
+  KSVGView ::
+       { elementHost   :: Maybe Element
        , tag           :: Txt
        , features      :: Features
-       , xlinks        :: (Map Txt Txt)
+       , xlinks        :: Map Txt Txt
        , keyedChildren :: [(Int,View)]
-       , childMap      :: (IntMap View)
-       }
+       } -> View
 
-  | forall a. Pure a => SomeView
+  SomeView :: Pure a =>
        { name       :: String
        , renderable :: a
-       }
+       } -> View
 
-  | PortalView
+  PortalView ::
       { portalDestination :: Element
       , portalView :: View
-      }
+      } -> View
 
 instance Default View where
   def = NullView Nothing
@@ -212,7 +209,6 @@ instance Pure View where
   view (SomeView _ a) = view a
   view a = a
 
-{-# INLINE tyCon #-}
 tyCon :: Typeable t => t -> String
 tyCon = tyConName . typeRepTyCon . typeOf
 
@@ -229,39 +225,30 @@ pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
   View a = SomeView (tyCon (undefined :: a)) a
 
-{-# INLINE getState #-}
 getState :: Ref m props state -> IO state
 getState = readIORef . crState
 
-{-# INLINE getProps #-}
 getProps :: Ref m props state -> IO props
 getProps = readIORef . crProps
 
-{-# INLINE getView #-}
 getView :: Ref m props state -> IO View
 getView = readIORef . crView
 
-{-# INLINE setStatePure #-}-- TODO: consider optimizing for this case?
 setStatePure :: Monad m => Ref m props state -> (props -> state -> state) -> IO Bool
 setStatePure r f = setState r (\p s -> return (f p s,return ()))
 
-{-# INLINE setStatePure_ #-}
 setStatePure_ :: Monad m => Ref m props state -> (props -> state -> state) -> IO ()
 setStatePure_ r f = void (setStatePure r f)
 
-{-# INLINE setState #-}
-setState :: Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
-setState cr = queueComponentUpdate cr . UpdateState
+setState :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
+setState cr f = queueComponentUpdate cr (UpdateState f)
 
-{-# INLINE setState_ #-}
-setState_ :: Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
+setState_ :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
 setState_ r f = void (setState r f)
 
-{-# INLINE setProps #-}
 setProps :: Ref m props state -> props -> IO Bool
 setProps cr = queueComponentUpdate cr . UpdateProperties
 
-{-# INLINE queueComponentUpdate #-}
 queueComponentUpdate :: Ref m props state -> ComponentPatch m props state -> IO Bool
 queueComponentUpdate crec cp = do
   mq <- readIORef (crPatchQueue crec)
@@ -271,7 +258,6 @@ queueComponentUpdate crec cp = do
       arrive q cp
       return True
 
-{-# INLINE getHost #-}
 getHost :: View -> Maybe Node
 -- EEK
 getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . readIORef . crView)

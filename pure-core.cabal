@@ -13,12 +13,12 @@ cabal-version:       >=1.10
 library
   build-depends:
     base >= 4.8 && < 5,
-    containers >= 0.5 && < 0.6,
     pure-default >= 0.7 && < 1,
     pure-json >= 0.7 && < 1,
     pure-txt >= 0.7 && < 1,
     pure-queue >= 0.7 && < 1,
-    pure-lifted >= 0.7 && < 1
+    pure-lifted >= 0.7 && < 1,
+    containers
 
   hs-source-dirs: src
 
