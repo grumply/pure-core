@@ -392,20 +392,25 @@ pattern AddKeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
   AddKeyedChildren ks v = addKeyedChildren ks v
 
 infixl 1 <|
+{-# INLINE (<|) #-}
 (<|) :: ToView b => a -> (a -> b) -> View
 (<|) a f = toView (f a)
 
+{-# INLINE (<||>) #-}
 (<||>) :: (ToView a, HasChildren a) => a -> [View] -> View
 (<||>) v cs = toView (setChildren cs v)
 
+{-# INLINE (<||#>) #-}
 (<||#>) :: (ToView a, HasKeyedChildren a) => a -> [(Int,View)] -> View
 (<||#>) v cs = toView (setKeyedChildren cs v)
 
-infixl 0 |>
-(|>) :: HasChildren a => a -> [View] -> a
-(|>) a cs = setChildren cs a
+{-# INLINE (|>) #-}
+infixr 9 |>
+(|>) :: HasChildren a => (a -> a) -> [View] -> a -> a
+(|>) f cs = f . setChildren cs
 
-infixl 0 |#>
-(|#>) :: HasKeyedChildren a => a -> [(Int,View)] -> a
-(|#>) a cs = setKeyedChildren cs a
+{-# INLINE (|#>) #-}
+infixr 9 |#>
+(|#>) :: HasKeyedChildren a => (a -> a) -> [(Int,View)] -> a -> a
+(|#>) f cs = f . setKeyedChildren cs
 
