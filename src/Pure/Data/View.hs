@@ -183,7 +183,8 @@ data View where
        } -> View
 
   PortalView ::
-      { portalDestination :: Element
+      { portalProxy :: Maybe Element
+      , portalDestination :: Element
       , portalView :: View
       } -> View
 
@@ -263,5 +264,5 @@ getHost :: View -> Maybe Node
 getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . readIORef . crView)
 getHost TextView  {..} = fmap toNode textHost
 getHost SomeView {}    = Nothing
-getHost PortalView {..} = getHost portalView
+getHost PortalView {..} = fmap toNode portalProxy
 getHost x              = fmap toNode $ elementHost x

@@ -117,7 +117,7 @@ pattern Raw v r <- ((id &&& id) -> (RawView _ _ _ r,v)) where
 -- Portal
 
 pattern Portal :: Element -> View -> View
-pattern Portal host v = PortalView host v
+pattern Portal host v = PortalView Nothing host v
 
 -- -- Keyed
 
