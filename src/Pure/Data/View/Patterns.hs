@@ -196,9 +196,9 @@ pattern AddClasses cs a <- Classes cs a where
 
 -- Styles
 
-pattern Style :: HasFeatures a => (Txt,Txt) -> a -> a
-pattern Style kv a <- ((const ("","") &&& id) -> (kv,a)) where
-  Style (k,v) a =
+pattern Style :: HasFeatures a => Txt -> Txt -> a -> a
+pattern Style k v a <- ((const ("","") &&& id) -> ((k,v),a)) where
+  Style k v a =
     let fs = getFeatures a
     in setFeatures (fs { styles = Map.insert k v (styles fs) }) a
 
