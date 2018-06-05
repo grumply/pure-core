@@ -194,7 +194,7 @@ instance Default View where
 instance IsString View where
   fromString s = fromTxt $ fromString s
 
-instance IsString [View] where
+instance {-# OVERLAPPING #-} IsString [View] where
   fromString s = [ fromString s ]
 
 instance FromTxt View where
@@ -219,8 +219,14 @@ class ToView a where
 instance {-# OVERLAPPABLE #-} (Typeable a, Pure a) => ToView a where
   toView = View
 
-instance {-# OVERLAPS #-}ToView View where
+instance {-# OVERLAPS #-} ToView View where
   toView = id
+
+instance {-# OVERLAPS #-} Default (Features -> Features) where
+  def = id
+
+instance {-# OVERLAPS #-} Default (View -> View) where
+  def = id
 
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
