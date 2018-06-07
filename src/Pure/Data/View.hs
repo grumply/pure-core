@@ -60,6 +60,7 @@ data Comp (m :: * -> *) props state = Monad m =>
       , initialized  :: IO ()
       , construct    :: IO state
       , mount        :: state -> IO state
+      , executing    :: m ()
       , mounted      :: IO ()
       , receive      :: props -> state -> m state
       , force        :: props -> state -> m Bool
@@ -79,6 +80,7 @@ instance Monad m => Default (Comp m props state) where
       , initialize  = return
       , initialized = return ()
       , mount       = return
+      , executing   = return ()
       , mounted     = return ()
       , receive     = \_ -> return
       , force       = \_ _ -> return True
