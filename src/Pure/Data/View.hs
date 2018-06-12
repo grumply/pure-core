@@ -146,7 +146,7 @@ data View where
        { elementHost :: Maybe Element
        , tag         :: Txt
        , features    :: Features
-       , children    :: ![View]
+       , children    :: [View]
        } -> View
 
   KHTMLView ::
