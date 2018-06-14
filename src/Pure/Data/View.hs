@@ -40,9 +40,9 @@ data Target = ElementTarget | WindowTarget | DocumentTarget deriving Eq
 
 data Listener =
   On
-    { eventName     :: Txt
-    , eventTarget   :: Target
-    , eventOptions  :: Options
+    { eventName     :: {-# UNPACK #-}!Txt
+    , eventTarget   :: !Target
+    , eventOptions  :: {-# UNPACK #-}!Options
     , eventAction   :: Evt -> IO ()
     , eventStopper  :: IO ()
     }
@@ -66,17 +66,17 @@ data Comp (m :: * -> *) props state = Monad m =>
       , force        :: props -> state -> m Bool
       , update       :: props -> state -> m ()
       , render       :: props -> state -> View
-      , updated      :: props -> state -> View -> m ()
-      , unmount      :: m ()
+      , updated      :: props -> state -> m ()
       , unmounted    :: m ()
       }
 
 instance Monad m => Default (Comp m props state) where
+  {-# INLINE def #-}
   def =
     Comp
       { performIO   = unsafeCoerce id
       , execute     = unsafeCoerce id
-      , construct   = return (error "Component.construct: no initial state.")
+      , construct   = return (error "Comp.construct: no initial state supplied.")
       , initialize  = return
       , initialized = return ()
       , mount       = return
@@ -86,8 +86,7 @@ instance Monad m => Default (Comp m props state) where
       , force       = \_ _ -> return True
       , update      = \_ _ -> return ()
       , render      = \_ _ -> NullView Nothing
-      , updated     = \_ _ _ -> return ()
-      , unmount     = return ()
+      , updated     = \_ _ -> return ()
       , unmounted   = return ()
       }
 
@@ -99,11 +98,11 @@ data ComponentPatch m props state
 data Ref m props state
   = Ref
       { crType       :: String
-      , crView       :: IORef View
-      , crProps      :: IORef props
-      , crState      :: IORef state
+      , crView       :: {-# UNPACK #-}!(IORef View)
+      , crProps      :: {-# UNPACK #-}!(IORef props)
+      , crState      :: {-# UNPACK #-}!(IORef state)
       , crComponent  :: Comp m props state
-      , crPatchQueue :: IORef (Maybe (Queue (ComponentPatch m props state)))
+      , crPatchQueue :: {-# UNPACK #-}!(IORef (Maybe (Queue (ComponentPatch m props state))))
       }
 
 data Features =
@@ -117,12 +116,15 @@ data Features =
        }
 
 instance Monoid Features where
+  {-# INLINE mempty #-}
   mempty = Features_ mempty mempty mempty mempty mempty mempty
+  {-# INLINE mappend #-}
   mappend (Features_ c1 s1 a1 p1 ls1 lc1) (Features_ c2 s2 a2 p2 ls2 lc2) =
     -- NOTE: mappending prefers the styles, attributes, and properties on the right
     Features_ (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
 
 instance Default Features where
+  {-# INLINE def #-}
   def = mempty
 
 data View where
@@ -132,7 +134,7 @@ data View where
 
   TextView ::
         { textHost :: Maybe Text
-        , content  :: {-# UNPACK #-}!Txt
+        , content  :: Txt
         } -> View
 
   RawView ::
@@ -196,15 +198,22 @@ data View where
       } -> View
 
 instance Default View where
+  {-# INLINE def #-}
   def = NullView Nothing
+
+instance IsString View where
+  {-# INLINE fromString #-}
+  fromString = TextView Nothing . toTxt
 
 class Pure a where
   view :: a -> View
 
 instance Pure View where
+  {-# INLINE view #-}
   view (SomeView _ a) = view a
   view a = a
 
+{-# INLINE tyCon #-}
 tyCon :: Typeable t => t -> String
 tyCon = tyConName . typeRepTyCon . typeOf
 
@@ -212,45 +221,58 @@ class ToView a where
   toView :: a -> View
 
 instance {-# OVERLAPPABLE #-} (Typeable a, Pure a) => ToView a where
+  {-# INLINE toView #-}
   toView = View
 
 instance {-# OVERLAPS #-} ToView View where
+  {-# INLINE toView #-}
   toView = id
 
 instance {-# OVERLAPS #-} Default (Features -> Features) where
+  {-# INLINE def #-}
   def = id
 
 instance {-# OVERLAPS #-} Default (View -> View) where
+  {-# INLINE def #-}
   def = id
 
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
   View a = SomeView (tyCon (undefined :: a)) a
 
-getState :: Ref m props state -> IO state
-getState = readIORef . crState
+{-# INLINE get #-}
+get :: Ref m props state -> IO state
+get = readIORef . crState
 
-getProps :: Ref m props state -> IO props
-getProps = readIORef . crProps
+{-# INLINE ask #-}
+ask :: Ref m props state -> IO props
+ask = readIORef . crProps
 
-getView :: Ref m props state -> IO View
-getView = readIORef . crView
+{-# INLINE look #-}
+look :: Ref m props state -> IO View
+look = readIORef . crView
 
-setStatePure :: Monad m => Ref m props state -> (props -> state -> state) -> IO Bool
-setStatePure r f = setState r (\p s -> return (f p s,return ()))
+{-# INLINE modify #-}
+modify :: Monad m => Ref m props state -> (props -> state -> state) -> IO Bool
+modify r f = modifyM r (\p s -> return (f p s,return ()))
 
-setStatePure_ :: Monad m => Ref m props state -> (props -> state -> state) -> IO ()
-setStatePure_ r f = void (setStatePure r f)
+{-# INLINE modify_ #-}
+modify_ :: Monad m => Ref m props state -> (props -> state -> state) -> IO ()
+modify_ r f = void (modify r f)
 
-setState :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
-setState cr f = queueComponentUpdate cr (UpdateState f)
+{-# INLINE modifyM #-}
+modifyM :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
+modifyM cr f = queueComponentUpdate cr (UpdateState f)
 
-setState_ :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
-setState_ r f = void (setState r f)
+{-# INLINE modifyM_ #-}
+modifyM_ :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
+modifyM_ r f = void (modifyM r f)
 
+{-# INLINE setProps #-}
 setProps :: Ref m props state -> props -> IO Bool
 setProps cr = queueComponentUpdate cr . UpdateProperties
 
+{-# INLINE queueComponentUpdate #-}
 queueComponentUpdate :: Ref m props state -> ComponentPatch m props state -> IO Bool
 queueComponentUpdate crec cp = do
   mq <- readIORef (crPatchQueue crec)
@@ -260,10 +282,10 @@ queueComponentUpdate crec cp = do
       arrive q cp
       return True
 
+{-# INLINE getHost #-}
 getHost :: View -> Maybe Node
--- EEK
 getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . readIORef . crView)
-getHost TextView  {..} = fmap toNode textHost
-getHost SomeView {}    = Nothing
-getHost PortalView {..} = fmap toNode portalProxy
-getHost x              = fmap toNode $ elementHost x
+getHost TextView      {..} = fmap toNode textHost
+getHost SomeView      {}   = Nothing
+getHost PortalView    {..} = fmap toNode portalProxy
+getHost x                  = fmap toNode (elementHost x)
