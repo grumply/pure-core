@@ -132,7 +132,7 @@ data View where
 
   TextView ::
         { textHost :: Maybe Text
-        , content  :: Txt
+        , content  :: {-# UNPACK #-}!Txt
         } -> View
 
   RawView ::
@@ -190,20 +190,13 @@ data View where
       , portalView :: View
       } -> View
 
+  LazyView :: Pure b =>
+      { lazyFun :: a -> b
+      , lazyArg :: a
+      } -> View
+
 instance Default View where
   def = NullView Nothing
-
-instance IsString View where
-  fromString s = fromTxt $ fromString s
-
-instance {-# OVERLAPPING #-} IsString [View] where
-  fromString s = [ fromString s ]
-
-instance FromTxt View where
-  fromTxt t = TextView Nothing t
-
-instance FromTxt [View] where
-  fromTxt t = [ fromTxt t ]
 
 class Pure a where
   view :: a -> View

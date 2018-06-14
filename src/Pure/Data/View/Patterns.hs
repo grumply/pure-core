@@ -20,11 +20,14 @@ module Pure.Data.View.Patterns
   , HasKeyedChildren(..), pattern KeyedChildren, pattern SetKeyedChildren
   , (<|), (<||>), (|>)
   , (<||#>), (|#>)
+  , lazy, lazy2, lazy3
+  , text, txt, string
   ) where
 
 -- This module exposes some hacky patterns due to GHCs lack of unidirectional expression patterns.
 -- They exist to create a consistent and readable syntax for view construction without overlapping
--- with Haskell's reserved words.
+-- with Haskell's reserved words. It is best to avoid using these patterns for inspection/pattern-
+-- matching.
 
 -- from pure-default
 import Pure.Data.Default (Default(..))
@@ -36,7 +39,7 @@ import Pure.Data.View
 import Pure.Data.Lifted (Element)
 
 -- from pure-txt
-import Pure.Data.Txt (Txt)
+import Pure.Data.Txt (Txt,ToTxt(..))
 
 -- from base
 import Control.Arrow ((&&&))
@@ -60,23 +63,45 @@ pattern EmptyList :: [a]
 pattern EmptyList <- (List.null -> True) where
   EmptyList = []
 
+-- Lazy
+
+lazy :: Pure p => (a -> p) -> a -> View
+lazy = LazyView
+
+lazy2 :: Pure p => (a -> b -> p) -> a -> b -> View
+lazy2 f a b = lazy (\a -> lazy (\b -> f a b) b) a
+
+lazy3 :: Pure p => (a -> b -> c -> p) -> a -> b -> c -> View
+lazy3 f a b c = lazy (\a -> lazy (\b -> lazy (\c -> f a b c) c) b) a
+
+-- text
+
+text :: (ToTxt a) => a -> View
+text = lazy (TextView Nothing . toTxt)
+
+txt :: Txt -> View
+txt = text
+
+string :: String -> View
+string = text
+
 -- Component
 
 pattern LibraryComponent :: forall m props state. Typeable props => (Ref m props state -> Comp m props state) -> props -> View
 pattern LibraryComponent v p <- ComponentView ((== (show (typeOf (undefined :: props)))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponent v !p = ComponentView (show (typeOf p)) p Nothing v
+  LibraryComponent v p = ComponentView (show (typeOf p)) p Nothing v
 
 pattern Component :: forall m props state. Typeable props => (Ref m props state -> Comp m props state) -> props -> View
 pattern Component v p <- ComponentView ((==) (tyCon (undefined :: props)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  Component v !p = ComponentView (tyCon p) p Nothing v
+  Component v p = ComponentView (tyCon p) p Nothing v
 
 pattern LibraryComponentIO :: forall props state. Typeable props => (Ref IO props state -> Comp IO props state) -> props -> View
 pattern LibraryComponentIO v p <- ComponentView ((== (show (typeOf (undefined :: props)))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponentIO v !p = ComponentView (show (typeOf p)) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
+  LibraryComponentIO v p = ComponentView (show (typeOf p)) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
 
 pattern ComponentIO :: forall props state. Typeable props => (Ref IO props state -> Comp IO props state) -> props -> View
 pattern ComponentIO v p <- ComponentView ((==) (tyCon (undefined :: props)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  ComponentIO v !p = ComponentView (tyCon p) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
+  ComponentIO v p = ComponentView (tyCon p) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
 
 -- Null
 
