@@ -205,6 +205,10 @@ instance IsString View where
   {-# INLINE fromString #-}
   fromString = TextView Nothing . toTxt
 
+instance FromTxt View where
+  {-# INLINE fromTxt #-}
+  fromTxt = TextView Nothing
+
 class Pure a where
   view :: a -> View
 
