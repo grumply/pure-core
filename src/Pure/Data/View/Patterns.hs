@@ -409,7 +409,7 @@ pattern KeyedChildren :: HasKeyedChildren a => [(Int,View)] -> a -> a
 pattern KeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
   KeyedChildren ks v = addKeyedChildren ks v
 
-infixl 1 <|
+infixl 8 <|
 {-# INLINE (<|) #-}
 (<|) :: ToView b => a -> (a -> b) -> View
 (<|) a f = toView (f a)
