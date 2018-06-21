@@ -232,14 +232,6 @@ instance {-# OVERLAPS #-} ToView View where
   {-# INLINE toView #-}
   toView = id
 
-instance {-# OVERLAPS #-} Default (Features -> Features) where
-  {-# INLINE def #-}
-  def = id
-
-instance {-# OVERLAPS #-} Default (View -> View) where
-  {-# INLINE def #-}
-  def = id
-
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
 pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
   View a = SomeView (tyCon (undefined :: a)) a
