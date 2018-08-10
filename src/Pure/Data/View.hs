@@ -118,10 +118,17 @@ data Features =
 instance Monoid Features where
   {-# INLINE mempty #-}
   mempty = Features_ mempty mempty mempty mempty mempty mempty
+#if !MIN_VERSION_base(4,11,0)
   {-# INLINE mappend #-}
   mappend (Features_ c1 s1 a1 p1 ls1 lc1) (Features_ c2 s2 a2 p2 ls2 lc2) =
     -- NOTE: mappending prefers the styles, attributes, and properties on the right
     Features_ (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
+#else
+instance Semigroup Features where
+  {-# INLINE (<>) #-}
+  (<>) (Features_ c1 s1 a1 p1 ls1 lc1) (Features_ c2 s2 a2 p2 ls2 lc2) =
+    Features_ (c1 <> c2) (s2 <> s1) (a2 <> a1) (p2 <> p1) (ls1 <> ls2) (lc1 <> lc2)
+#endif
 
 instance Default Features where
   {-# INLINE def #-}
