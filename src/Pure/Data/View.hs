@@ -13,6 +13,7 @@ import Data.STRef (STRef)
 import Data.String (IsString(..))
 import Data.Traversable (for)
 import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf)
+import Data.Unique (Unique,newUnique)
 import GHC.Generics (Generic(..))
 import System.IO.Unsafe (unsafePerformIO)
 import Unsafe.Coerce (unsafeCoerce)
@@ -217,6 +218,8 @@ instance FromTxt View where
   fromTxt = TextView Nothing
 
 class Pure a where
+  __pure_identity :: a -> Unique
+  __pure_identity _ = unsafePerformIO newUnique
   view :: a -> View
 
 instance Pure View where
