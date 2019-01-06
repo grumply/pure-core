@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, TemplateHaskell #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, MagicHash #-}
 module Pure.Data.View where
 
 -- from base
@@ -12,8 +12,9 @@ import Data.Proxy (Proxy(..))
 import Data.STRef (STRef)
 import Data.String (IsString(..))
 import Data.Traversable (for)
-import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf,typeRepFingerprint)
+import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf,typeRepFingerprint,cast)
 import Data.Unique (Unique,newUnique)
+import GHC.Exts (reallyUnsafePtrEquality#,isTrue#)
 import GHC.Fingerprint.Type (Fingerprint())
 import GHC.Generics (Generic(..))
 import System.IO.Unsafe (unsafePerformIO)
@@ -135,10 +136,16 @@ instance Default Features where
   {-# INLINE def #-}
   def = mempty
 
-data TypeWitness a = TypeWitness { unCompWitness :: {-# UNPACK #-}!Fingerprint }
+data TypeWitness a = TypeWitness { unCompWitness :: Fingerprint }
+
+witness :: forall a. Typeable a => TypeWitness a
+witness = TypeWitness (typeRepFingerprint $ typeOf (undefined :: a))
 
 sameTypeWitness :: TypeWitness a -> TypeWitness b -> Bool
-sameTypeWitness (TypeWitness fp1) (TypeWitness fp2) = fp1 == fp2
+sameTypeWitness (TypeWitness fp1) (TypeWitness fp2) =
+  case reallyUnsafePtrEquality# fp1 fp2 of
+    1# -> True
+    _  -> fp1 == fp2
 
 data View where
   NullView ::
@@ -195,8 +202,7 @@ data View where
        } -> View
 
   SomeView :: Pure a =>
-       { __pure_witness :: TypeWitness a
-       , renderable :: a
+       { renderable :: a
        } -> View
 
   PortalView ::
@@ -222,12 +228,17 @@ instance FromTxt View where
   {-# INLINE fromTxt #-}
   fromTxt = TextView Nothing
 
+asProxyOf :: a -> Proxy a
+asProxyOf _ = Proxy
+  
 class Typeable a => Pure a where
+  __pure_witness :: Proxy a -> TypeWitness a
+  __pure_witness _ = witness
   view :: a -> View
 
 instance Pure View where
   {-# INLINE view #-}
-  view (SomeView _ a) = view a
+  view (SomeView a) = view a
   view a = a
 
 {-# INLINE tyCon #-}
@@ -246,8 +257,8 @@ instance {-# OVERLAPS #-} ToView View where
   toView = id
 
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
-pattern View a <- (SomeView (sameTypeWitness $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: a)|]) -> True) (unsafeCoerce -> a)) where
-  View a = SomeView $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: a)|]) a
+pattern View a <- (SomeView (cast -> Just a)) where
+  View a = SomeView a
 
 {-# INLINE get #-}
 get :: Ref m props state -> IO state
