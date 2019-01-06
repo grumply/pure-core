@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings, BangPatterns #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings, BangPatterns, TemplateHaskell #-}
 module Pure.Data.View.Patterns
   ( pattern SimpleHTML
   , pattern SimpleSVG
@@ -46,7 +46,7 @@ import Control.Arrow ((&&&))
 import Control.Monad (void)
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
-import Data.Typeable (Typeable,TypeRep(),typeOf)
+import Data.Typeable (Typeable,TypeRep(),typeOf,typeRepFingerprint)
 import Data.List as List (null)
 import Data.Map.Lazy as Map (fromList,null,empty,union,toList,insert)
 import Data.Set as Set (empty,fromList,null,empty,union,toList,insert)
@@ -87,21 +87,21 @@ string = text
 
 -- Component
 
-pattern LibraryComponent :: forall m props state. Typeable props => (Ref m props state -> Comp m props state) -> props -> View
-pattern LibraryComponent v p <- ComponentView ((== (show (typeOf (undefined :: props)))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponent v p = ComponentView (show (typeOf p)) p Nothing v
+pattern LibraryComponent :: forall m props state. (Typeable m, Typeable props, Typeable state) => (Ref m props state -> Comp m props state) -> props -> View
+pattern LibraryComponent v p <- ComponentView (sameTypeWitness $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|]) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
+  LibraryComponent v p = ComponentView $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|])p Nothing v
 
-pattern Component :: forall m props state. Typeable props => (Ref m props state -> Comp m props state) -> props -> View
-pattern Component v p <- ComponentView ((==) (tyCon (undefined :: props)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  Component v p = ComponentView (tyCon p) p Nothing v
+pattern Component :: forall m props state. (Typeable m, Typeable props, Typeable state) => (Ref m props state -> Comp m props state) -> props -> View
+pattern Component v p <- ComponentView (sameTypeWitness $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|]) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
+  Component v p = ComponentView $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|])p Nothing v
 
-pattern LibraryComponentIO :: forall props state. Typeable props => (Ref IO props state -> Comp IO props state) -> props -> View
-pattern LibraryComponentIO v p <- ComponentView ((== (show (typeOf (undefined :: props)))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponentIO v p = ComponentView (show (typeOf p)) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
+pattern LibraryComponentIO :: forall props state. (Typeable props, Typeable state) => (Ref IO props state -> Comp IO props state) -> props -> View
+pattern LibraryComponentIO v p <- ComponentView (sameTypeWitness $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|]) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
+  LibraryComponentIO v p = ComponentView $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|])p Nothing (\ref -> (v ref) { performIO = id, execute = id })
 
-pattern ComponentIO :: forall props state. Typeable props => (Ref IO props state -> Comp IO props state) -> props -> View
-pattern ComponentIO v p <- ComponentView ((==) (tyCon (undefined :: props)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  ComponentIO v p = ComponentView (tyCon p) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
+pattern ComponentIO :: forall props state. (Typeable props, Typeable state) => (Ref IO props state -> Comp IO props state) -> props -> View
+pattern ComponentIO v p <- ComponentView (sameTypeWitness $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|]) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
+  ComponentIO v p = ComponentView $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: IO (props,state))|]) p Nothing (\ref -> (v ref) { performIO = id, execute = id })
 
 -- Null
 

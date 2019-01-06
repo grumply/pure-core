@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, TemplateHaskell #-}
 module Pure.Data.View where
 
 -- from base
@@ -12,8 +12,9 @@ import Data.Proxy (Proxy(..))
 import Data.STRef (STRef)
 import Data.String (IsString(..))
 import Data.Traversable (for)
-import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf)
+import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf,typeRepFingerprint)
 import Data.Unique (Unique,newUnique)
+import GHC.Fingerprint.Type (Fingerprint())
 import GHC.Generics (Generic(..))
 import System.IO.Unsafe (unsafePerformIO)
 import Unsafe.Coerce (unsafeCoerce)
@@ -98,8 +99,7 @@ data ComponentPatch m props state
 
 data Ref m props state
   = Ref
-      { crType       :: String
-      , crView       :: {-# UNPACK #-}!(IORef View)
+      { crView       :: {-# UNPACK #-}!(IORef View)
       , crProps      :: {-# UNPACK #-}!(IORef props)
       , crState      :: {-# UNPACK #-}!(IORef state)
       , crComponent  :: Comp m props state
@@ -135,6 +135,11 @@ instance Default Features where
   {-# INLINE def #-}
   def = mempty
 
+data TypeWitness a = TypeWitness { unCompWitness :: {-# UNPACK #-}!Fingerprint }
+
+sameTypeWitness :: TypeWitness a -> TypeWitness b -> Bool
+sameTypeWitness (TypeWitness fp1) (TypeWitness fp2) = fp1 == fp2
+
 data View where
   NullView ::
         { elementHost :: Maybe Element
@@ -167,7 +172,7 @@ data View where
        } -> View
 
   ComponentView ::
-       { name   :: String
+       { __comp_witness :: TypeWitness (m (props,state))
        , props  :: props
        , record :: Maybe (Ref m props state)
        , comp   :: Ref m props state -> Comp m props state
@@ -190,7 +195,7 @@ data View where
        } -> View
 
   SomeView :: Pure a =>
-       { name       :: String
+       { __pure_witness :: TypeWitness a
        , renderable :: a
        } -> View
 
@@ -217,9 +222,7 @@ instance FromTxt View where
   {-# INLINE fromTxt #-}
   fromTxt = TextView Nothing
 
-class Pure a where
-  __pure_identity :: a -> Unique
-  __pure_identity _ = unsafePerformIO newUnique
+class Typeable a => Pure a where
   view :: a -> View
 
 instance Pure View where
@@ -243,8 +246,8 @@ instance {-# OVERLAPS #-} ToView View where
   toView = id
 
 pattern View :: forall a. (Pure a, Typeable a) => a -> View
-pattern View a <- (SomeView ((==) (tyCon (undefined :: a)) -> True) (unsafeCoerce -> a)) where
-  View a = SomeView (tyCon (undefined :: a)) a
+pattern View a <- (SomeView (sameTypeWitness $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: a)|]) -> True) (unsafeCoerce -> a)) where
+  View a = SomeView $([|TypeWitness $! typeRepFingerprint $! typeOf (undefined :: a)|]) a
 
 {-# INLINE get #-}
 get :: Ref m props state -> IO state
