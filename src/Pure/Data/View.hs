@@ -230,8 +230,9 @@ instance FromTxt View where
 
 asProxyOf :: a -> Proxy a
 asProxyOf _ = Proxy
-  
+
 class Typeable a => Pure a where
+  {-# NOINLINE __pure_witness #-}
   __pure_witness :: Proxy a -> TypeWitness a
   __pure_witness _ = witness
   view :: a -> View
