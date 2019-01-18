@@ -166,16 +166,19 @@ pattern Keyed v <- (isKeyed &&& id -> (True,v)) where
 class HasFeatures a where
   getFeatures :: a -> Features
   setFeatures :: Features -> a -> a
+  {-# INLINE addFeatures #-}
   addFeatures :: Features -> a -> a
   addFeatures fs a = setFeatures (getFeatures a <> fs) a
 
 instance HasFeatures View where
+  {-# INLINE getFeatures #-}
   getFeatures NullView {} = mempty
   getFeatures TextView {} = mempty
   getFeatures ComponentView {} = mempty
   getFeatures SomeView {} = mempty
   getFeatures PortalView{..} = getFeatures portalView
   getFeatures v = features v
+  {-# INLINE setFeatures #-}
   setFeatures _ v@NullView {} = v
   setFeatures _ v@TextView {} = v
   setFeatures _ v@ComponentView {} = v
@@ -184,8 +187,11 @@ instance HasFeatures View where
   setFeatures fs v = v { features = fs }
 
 instance HasFeatures Features where
+  {-# INLINE getFeatures #-}
   getFeatures = id
+  {-# INLINE setFeatures #-}
   setFeatures = const
+  {-# INLINE addFeatures #-}
   addFeatures = (<>)
 
 pattern SetFeatures :: HasFeatures a => Features -> a -> a
@@ -318,18 +324,22 @@ pattern Lifecycles lc v <- (((lifecycles . getFeatures) &&& id) -> (lc,v)) where
 class HasXLinks a where
   getXLinks :: a -> [(Txt,Txt)]
   setXLinks :: [(Txt,Txt)] -> a -> a
+  {-# INLINE addXLinks #-}
   addXLinks :: [(Txt,Txt)] -> a -> a
   addXLinks xl a = setXLinks (getXLinks a ++ xl) a
 
 instance HasXLinks View where
+  {-# INLINE getXLinks #-}
   getXLinks SVGView {..} = Map.toList xlinks
   getXLinks KSVGView {..} = Map.toList xlinks
   getXLinks PortalView {..} = getXLinks portalView
   getXLinks _ = []
+  {-# INLINE setXLinks #-}
   setXLinks xl khtml@SVGView {} = khtml { xlinks = Map.fromList xl }
   setXLinks xl ksvg@KSVGView {} = ksvg { xlinks = Map.fromList xl }
   setXLinks xl PortalView {..}  = PortalView { portalView = setXLinks xl portalView, .. }
   setXLinks _ v = v
+  {-# INLINE addXLinks #-}
   addXLinks xl v@SVGView {} = v { xlinks = Map.union (Map.fromList xl) (xlinks v) }
   addXLinks xl v@KSVGView {} = v { xlinks = Map.union (Map.fromList xl) (xlinks v) }
   addXLinks xl PortalView {..} = PortalView { portalView = addXLinks xl portalView, .. }
@@ -354,18 +364,22 @@ pattern XLinks xl v <- ((getXLinks &&& id) -> (xl,v)) where
 class HasChildren a where
   getChildren :: a -> [View]
   setChildren :: [View] -> a -> a
+  {-# INLINE addChildren #-}
   addChildren :: [View] -> a -> a
   addChildren cs a = setChildren (getChildren a ++ cs) a
 
 instance HasChildren View where
+  {-# INLINE getChildren #-}
   getChildren v@HTMLView {} = children v
   getChildren v@SVGView {} = children v
   getChildren PortalView {..} = getChildren portalView
   getChildren _  = []
+  {-# INLINE setChildren #-}
   setChildren cs v@HTMLView {} = v { children = cs }
   setChildren cs v@SVGView {} = v { children = cs }
   setChildren cs PortalView {..} = PortalView { portalView = setChildren cs portalView, .. }
   setChildren _ v = v
+  {-# INLINE addChildren #-}
   addChildren cs v@HTMLView {} = v { children = children v ++ cs }
   addChildren cs v@SVGView {} = v { children = children v ++ cs }
   addChildren cs PortalView {..} = PortalView { portalView = setChildren cs portalView, .. }
@@ -384,18 +398,22 @@ pattern Children cs v <- ((getChildren &&& id) -> (cs,v)) where
 class HasKeyedChildren a where
   getKeyedChildren :: a -> [(Int,View)]
   setKeyedChildren :: [(Int,View)] -> a -> a
+  {-# INLINE addKeyedChildren #-}
   addKeyedChildren :: [(Int,View)] -> a -> a
   addKeyedChildren cs a = setKeyedChildren (getKeyedChildren a ++ cs) a
 
 instance HasKeyedChildren View where
+  {-# INLINE getKeyedChildren #-}
   getKeyedChildren v@KHTMLView {} = keyedChildren v
   getKeyedChildren v@SVGView {} = keyedChildren v
   getKeyedChildren PortalView {..} = getKeyedChildren portalView
   getKeyedChildren _ = []
+  {-# INLINE setKeyedChildren #-}
   setKeyedChildren cs v@KHTMLView {} = v { keyedChildren = cs }
   setKeyedChildren cs v@KSVGView {} = v { keyedChildren = cs }
   setKeyedChildren cs PortalView {..} = PortalView { portalView = setKeyedChildren cs portalView, .. }
   setKeyedChildren _ v = v
+  {-# INLINE addKeyedChildren #-}
   addKeyedChildren cs v@KHTMLView {} = v { keyedChildren = keyedChildren v ++ cs }
   addKeyedChildren cs v@KSVGView {} = v { keyedChildren = keyedChildren v ++ cs }
   addKeyedChildren cs PortalView {..} = PortalView { portalView = setKeyedChildren cs portalView, .. }
@@ -425,10 +443,10 @@ infixl 8 <|
 {-# INLINE (|>) #-}
 infixr 9 |>
 (|>) :: HasChildren a => (a -> a) -> [View] -> a -> a
-(|>) f cs = f . setChildren cs
+(|>) f cs = setChildren cs . f
 
 {-# INLINE (|#>) #-}
 infixr 9 |#>
 (|#>) :: HasKeyedChildren a => (a -> a) -> [(Int,View)] -> a -> a
-(|#>) f cs = f . setKeyedChildren cs
+(|#>) f cs = setKeyedChildren cs . f
 

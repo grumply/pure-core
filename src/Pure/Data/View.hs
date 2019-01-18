@@ -43,9 +43,9 @@ data Target = ElementTarget | WindowTarget | DocumentTarget deriving Eq
 
 data Listener =
   On
-    { eventName     :: {-# UNPACK #-}!Txt
-    , eventTarget   :: !Target
-    , eventOptions  :: {-# UNPACK #-}!Options
+    { eventName     :: Txt
+    , eventTarget   :: Target
+    , eventOptions  :: Options
     , eventAction   :: Evt -> IO ()
     , eventStopper  :: IO ()
     }
@@ -100,11 +100,11 @@ data ComponentPatch m props state
 
 data Ref m props state
   = Ref
-      { crView       :: {-# UNPACK #-}!(IORef View)
-      , crProps      :: {-# UNPACK #-}!(IORef props)
-      , crState      :: {-# UNPACK #-}!(IORef state)
+      { crView       :: IORef View
+      , crProps      :: IORef props
+      , crState      :: IORef state
       , crComponent  :: Comp m props state
-      , crPatchQueue :: {-# UNPACK #-}!(IORef (Maybe (Queue (ComponentPatch m props state))))
+      , crPatchQueue :: IORef (Maybe (Queue (ComponentPatch m props state)))
       }
 
 data Features =
@@ -148,22 +148,6 @@ sameTypeWitness (TypeWitness fp1) (TypeWitness fp2) =
     _  -> fp1 == fp2
 
 data View where
-  NullView ::
-        { elementHost :: Maybe Element
-        } -> View
-
-  TextView ::
-        { textHost :: Maybe Text
-        , content  :: Txt
-        } -> View
-
-  RawView ::
-       { elementHost:: Maybe Element
-       , tag        :: Txt
-       , features   :: Features
-       , content    :: Txt
-       } -> View
-
   HTMLView ::
        { elementHost :: Maybe Element
        , tag         :: Txt
@@ -171,11 +155,8 @@ data View where
        , children    :: [View]
        } -> View
 
-  KHTMLView ::
-       { elementHost   :: Maybe Element
-       , tag           :: Txt
-       , features      :: Features
-       , keyedChildren :: [(Int,View)]
+  SomeView :: Pure a =>
+       { renderable :: a
        } -> View
 
   ComponentView ::
@@ -183,6 +164,27 @@ data View where
        , props  :: props
        , record :: Maybe (Ref m props state)
        , comp   :: Ref m props state -> Comp m props state
+       } -> View
+
+  LazyView :: Pure b =>
+      { lazyFun :: a -> b
+      , lazyArg :: a
+      } -> View
+
+  TextView ::
+        { textHost :: Maybe Text
+        , content  :: Txt
+        } -> View
+
+  NullView ::
+        { elementHost :: Maybe Element
+        } -> View
+
+  RawView ::
+       { elementHost:: Maybe Element
+       , tag        :: Txt
+       , features   :: Features
+       , content    :: Txt
        } -> View
 
   SVGView ::
@@ -193,6 +195,13 @@ data View where
        , children    :: [View]
        } -> View
 
+  KHTMLView ::
+       { elementHost   :: Maybe Element
+       , tag           :: Txt
+       , features      :: Features
+       , keyedChildren :: [(Int,View)]
+       } -> View
+
   KSVGView ::
        { elementHost   :: Maybe Element
        , tag           :: Txt
@@ -201,19 +210,10 @@ data View where
        , keyedChildren :: [(Int,View)]
        } -> View
 
-  SomeView :: Pure a =>
-       { renderable :: a
-       } -> View
-
   PortalView ::
       { portalProxy :: Maybe Element
       , portalDestination :: Element
       , portalView :: View
-      } -> View
-
-  LazyView :: Pure b =>
-      { lazyFun :: a -> b
-      , lazyArg :: a
       } -> View
 
 instance Default View where
