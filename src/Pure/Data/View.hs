@@ -55,56 +55,50 @@ data Lifecycle =
     { withHost :: Node -> IO ()
     }
 
-data Comp (m :: * -> *) props state = Monad m =>
-    Comp
-      { performIO    :: forall a. IO a ->  m a
-      , execute      :: forall a.  m a -> IO a
-      , initialize   :: state -> IO state
-      , initialized  :: IO ()
-      , construct    :: IO state
-      , mount        :: state -> IO state
-      , executing    :: m ()
-      , mounted      :: IO ()
-      , receive      :: props -> state -> m state
-      , force        :: props -> state -> m Bool
-      , update       :: props -> state -> m ()
-      , render       :: props -> state -> View
-      , updated      :: props -> state -> m ()
-      , unmounted    :: m ()
-      }
+data Comp props state = Comp
+  { initialize   :: state -> IO state
+  , initialized  :: IO ()
+  , construct    :: IO state
+  , mount        :: state -> IO state
+  , executing    :: IO ()
+  , mounted      :: IO ()
+  , receive      :: props -> state -> IO state
+  , force        :: props -> state -> IO Bool
+  , update       :: props -> state -> IO ()
+  , render       :: props -> state -> View
+  , updated      :: props -> state -> IO ()
+  , unmounted    :: IO ()
+  }
 
-instance Monad m => Default (Comp m props state) where
+instance Default (Comp props state) where
   {-# INLINE def #-}
-  def =
-    Comp
-      { performIO   = unsafeCoerce id
-      , execute     = unsafeCoerce id
-      , construct   = return (error "Comp.construct: no initial state supplied.")
-      , initialize  = return
-      , initialized = return ()
-      , mount       = return
-      , executing   = return ()
-      , mounted     = return ()
-      , receive     = \_ -> return
-      , force       = \_ _ -> return True
-      , update      = \_ _ -> return ()
-      , render      = \_ _ -> NullView Nothing
-      , updated     = \_ _ -> return ()
-      , unmounted   = return ()
-      }
+  def = Comp
+    { construct   = return (error "Comp.construct: no initial state supplied.")
+    , initialize  = return
+    , initialized = return ()
+    , mount       = return
+    , executing   = return ()
+    , mounted     = return ()
+    , receive     = \_ -> return
+    , force       = \_ _ -> return True
+    , update      = \_ _ -> return ()
+    , render      = \_ _ -> NullView Nothing
+    , updated     = \_ _ -> return ()
+    , unmounted   = return ()
+    }
 
-data ComponentPatch m props state
+data ComponentPatch props state
   = Unmount (Maybe View) (IO ())
   | UpdateProperties props
-  | UpdateState (props -> state -> m (state,m ()))
+  | UpdateState (props -> state -> IO (state,IO ()))
 
-data Ref m props state
+data Ref props state
   = Ref
       { crView       :: IORef View
       , crProps      :: IORef props
       , crState      :: IORef state
-      , crComponent  :: Comp m props state
-      , crPatchQueue :: IORef (Maybe (Queue (ComponentPatch m props state)))
+      , crComponent  :: IORef (Comp props state)
+      , crPatchQueue :: IORef (Maybe (Queue (ComponentPatch props state)))
       }
 
 data Features =
@@ -151,25 +145,9 @@ data View where
   HTMLView ::
        { elementHost :: Maybe Element
        , tag         :: Txt
-       , features    :: Features
+       , features    :: {-# UNPACK #-}!Features
        , children    :: [View]
        } -> View
-
-  SomeView :: Pure a =>
-       { renderable :: a
-       } -> View
-
-  ComponentView ::
-       { __comp_witness :: TypeWitness (m (props,state))
-       , props  :: props
-       , record :: Maybe (Ref m props state)
-       , comp   :: Ref m props state -> Comp m props state
-       } -> View
-
-  LazyView :: Pure b =>
-      { lazyFun :: a -> b
-      , lazyArg :: a
-      } -> View
 
   TextView ::
         { textHost :: Maybe Text
@@ -183,38 +161,54 @@ data View where
   RawView ::
        { elementHost:: Maybe Element
        , tag        :: Txt
-       , features   :: Features
+       , features   :: {-# UNPACK #-}!Features
        , content    :: Txt
        } -> View
 
   SVGView ::
        { elementHost :: Maybe Element
        , tag         :: Txt
-       , features    :: Features
-       , xlinks      :: Map Txt Txt
+       , features    :: {-# UNPACK #-}!Features
+       , xlinks      :: !(Map Txt Txt)
        , children    :: [View]
        } -> View
 
   KHTMLView ::
        { elementHost   :: Maybe Element
        , tag           :: Txt
-       , features      :: Features
+       , features      :: {-# UNPACK #-}!Features
        , keyedChildren :: [(Int,View)]
        } -> View
 
   KSVGView ::
        { elementHost   :: Maybe Element
        , tag           :: Txt
-       , features      :: Features
-       , xlinks        :: Map Txt Txt
+       , features      :: {-# UNPACK #-}!Features
+       , xlinks        :: !(Map Txt Txt)
        , keyedChildren :: [(Int,View)]
        } -> View
+
+  SomeView :: Pure a =>
+       { renderable :: a
+       } -> View
+
+  LazyView :: Pure b =>
+      { lazyFun :: a -> b
+      , lazyArg :: a
+      } -> View
 
   PortalView ::
       { portalProxy :: Maybe Element
       , portalDestination :: Element
       , portalView :: View
       } -> View
+
+  ComponentView ::
+       { __comp_witness :: TypeWitness (props,state)
+       , props  :: props
+       , record :: Maybe (Ref props state)
+       , comp   :: Ref props state -> Comp props state
+       } -> View
 
 instance Default View where
   {-# INLINE def #-}
@@ -262,39 +256,39 @@ pattern View a <- (SomeView (cast -> Just a)) where
   View a = SomeView a
 
 {-# INLINE get #-}
-get :: Ref m props state -> IO state
+get :: Ref props state -> IO state
 get = readIORef . crState
 
 {-# INLINE ask #-}
-ask :: Ref m props state -> IO props
+ask :: Ref props state -> IO props
 ask = readIORef . crProps
 
 {-# INLINE look #-}
-look :: Ref m props state -> IO View
+look :: Ref props state -> IO View
 look = readIORef . crView
 
 {-# INLINE modify #-}
-modify :: Monad m => Ref m props state -> (props -> state -> state) -> IO Bool
+modify :: Ref props state -> (props -> state -> state) -> IO Bool
 modify r f = modifyM r (\p s -> return (f p s,return ()))
 
 {-# INLINE modify_ #-}
-modify_ :: Monad m => Ref m props state -> (props -> state -> state) -> IO ()
+modify_ :: Ref props state -> (props -> state -> state) -> IO ()
 modify_ r f = void (modify r f)
 
 {-# INLINE modifyM #-}
-modifyM :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO Bool
+modifyM :: Ref props state -> (props -> state -> IO (state,IO ())) -> IO Bool
 modifyM cr f = queueComponentUpdate cr (UpdateState f)
 
 {-# INLINE modifyM_ #-}
-modifyM_ :: Monad m => Ref m props state -> (props -> state -> m (state,m ())) -> IO ()
+modifyM_ :: Ref props state -> (props -> state -> IO (state,IO ())) -> IO ()
 modifyM_ r f = void (modifyM r f)
 
 {-# INLINE setProps #-}
-setProps :: Ref m props state -> props -> IO Bool
+setProps :: Ref props state -> props -> IO Bool
 setProps cr = queueComponentUpdate cr . UpdateProperties
 
 {-# INLINE queueComponentUpdate #-}
-queueComponentUpdate :: Ref m props state -> ComponentPatch m props state -> IO Bool
+queueComponentUpdate :: Ref props state -> ComponentPatch props state -> IO Bool
 queueComponentUpdate crec cp = do
   mq <- readIORef (crPatchQueue crec)
   case mq of
