@@ -86,6 +86,7 @@ string :: String -> View
 string = text
 
 -- Component
+-- NOTE: these are all equivalent now; always use Component.
 
 pattern LibraryComponent :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern LibraryComponent v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
@@ -109,13 +110,25 @@ pattern Null <- (NullView _) where
 
 -- HTML
 
+viewHTMLTag :: View -> Maybe Txt
+viewHTMLTag (HTMLView _ tag _ _) = Just tag
+viewHTMLTag (KHTMLView _ tag _ _) = Just tag
+viewHTMLTag _ = Nothing
+
 pattern SimpleHTML :: Txt -> View
-pattern SimpleHTML tag = HTMLView Nothing tag (Features_ EmptySet EmptyMap EmptyMap EmptyMap EmptyList EmptyList) EmptyList
+pattern SimpleHTML tag <- (viewHTMLTag -> Just tag) where
+  SimpleHTML tag = HTMLView Nothing tag (Features_ EmptySet EmptyMap EmptyMap EmptyMap EmptyList EmptyList) EmptyList
 
 -- SVG
 
+viewSVGTag :: View -> Maybe Txt
+viewSVGTag (SVGView _ tag _ _ _) = Just tag
+viewSVGTag (KSVGView _ tag _ _ _) = Just tag
+viewSVGTag _ = Nothing
+
 pattern SimpleSVG :: Txt -> View
-pattern SimpleSVG tag = SVGView Nothing tag (Features_ EmptySet EmptyMap EmptyMap EmptyMap EmptyList EmptyList) EmptyMap EmptyList
+pattern SimpleSVG tag <- (viewSVGTag -> Just tag) where
+  SimpleSVG tag = SVGView Nothing tag (Features_ EmptySet EmptyMap EmptyMap EmptyMap EmptyList EmptyList) EmptyMap EmptyList
 
 -- Raw
 
