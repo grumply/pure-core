@@ -13,7 +13,7 @@ module Pure.Data.View.Patterns
   , pattern Style, pattern Styles, pattern SetStyles
   , pattern Property, pattern Properties, pattern SetProperties
   , pattern Attribute, pattern Attributes, pattern SetAttributes
-  , pattern Lifecycle, pattern Lifecycles, pattern SetLifecycles
+  , pattern Lifecycle, pattern Lifecycles, pattern SetLifecycles, pattern WithHost
   , pattern Listener, pattern Listeners, pattern SetListeners
   , HasXLinks(..), pattern XLink, pattern XLinks, pattern SetXLinks
   , HasChildren(..), pattern Children, pattern SetChildren
@@ -36,7 +36,7 @@ import Pure.Data.Default (Default(..))
 import Pure.Data.View
 
 -- from pure-lifted
-import Pure.Data.Lifted (Element)
+import Pure.Data.Lifted (Element,Node)
 
 -- from pure-txt
 import Pure.Data.Txt (Txt,ToTxt(..))
@@ -329,6 +329,9 @@ pattern Lifecycles lc v <- (((lifecycles . getFeatures) &&& id) -> (lc,v)) where
   Lifecycles lc v =
     let fs = getFeatures v
     in setFeatures (fs { lifecycles = lc ++ lifecycles fs }) v
+
+pattern WithHost :: HasFeatures a => (Node -> IO ()) -> a -> a
+pattern WithHost f a = Lifecycle (HostRef f) a
 
 -- XLinks
 
