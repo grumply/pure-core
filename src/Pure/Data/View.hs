@@ -60,7 +60,7 @@ data Comp props state = Comp
   , initialized  :: IO ()
   , construct    :: IO state
   , mount        :: state -> IO state
-  , executing    :: IO ()
+  , executing    :: state -> IO state
   , mounted      :: IO ()
   , receive      :: props -> state -> IO state
   , force        :: props -> state -> IO Bool
@@ -77,7 +77,7 @@ instance Default (Comp props state) where
     , initialize  = return
     , initialized = return ()
     , mount       = return
-    , executing   = return ()
+    , executing   = return
     , mounted     = return ()
     , receive     = \_ -> return
     , force       = \_ _ -> return True
