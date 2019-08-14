@@ -69,10 +69,13 @@ lazy :: Pure p => (a -> p) -> a -> View
 lazy = LazyView
 
 lazy2 :: Pure p => (a -> b -> p) -> a -> b -> View
-lazy2 f a b = lazy (\a -> lazy (\b -> f a b) b) a
+lazy2 f a b = lazy (\(a,b) -> f a b) (a,b)
 
 lazy3 :: Pure p => (a -> b -> c -> p) -> a -> b -> c -> View
-lazy3 f a b c = lazy (\a -> lazy (\b -> lazy (\c -> f a b c) c) b) a
+lazy3 f a b c = lazy (\(a,b,c) -> f a b c) (a,b,c)
+
+lazy4 :: Pure p => (a -> b -> c -> d -> p) -> a -> b -> c -> d -> View
+lazy4 f a b c d = lazy (\(a,b,c,d) -> f a b c d) (a,b,c,d)
 
 -- text
 
