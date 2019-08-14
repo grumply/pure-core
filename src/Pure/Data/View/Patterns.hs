@@ -93,11 +93,11 @@ string = text
 
 pattern LibraryComponent :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern LibraryComponent v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponent v p = ComponentView witness p Nothing v
+  LibraryComponent v p = lazy (\p -> ComponentView witness p Nothing v) p
 
 pattern Component :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern Component v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  Component v p = ComponentView witness p Nothing v
+  Component v p = lazy (\p -> ComponentView witness p Nothing v) p
 
 pattern LibraryComponentIO :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern LibraryComponentIO v p = LibraryComponent v p
