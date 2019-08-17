@@ -20,7 +20,7 @@ module Pure.Data.View.Patterns
   , HasKeyedChildren(..), pattern KeyedChildren, pattern SetKeyedChildren
   , (<|), (<||>), (|>)
   , (<||#>), (|#>)
-  , lazy, lazy2, lazy3
+  , lazy, lazy2, lazy3, lazy4, lazy 5
   , text, txt, string
   ) where
 
@@ -65,17 +65,20 @@ pattern EmptyList <- (List.null -> True) where
 
 -- Lazy
 
-lazy :: Pure p => (a -> p) -> a -> View
+lazy :: (a -> View) -> a -> View
 lazy = LazyView
 
-lazy2 :: Pure p => (a -> b -> p) -> a -> b -> View
+lazy2 :: (a -> b -> View) -> a -> b -> View
 lazy2 f a b = lazy (\(a,b) -> f a b) (a,b)
 
-lazy3 :: Pure p => (a -> b -> c -> p) -> a -> b -> c -> View
+lazy3 :: (a -> b -> c -> View) -> a -> b -> c -> View
 lazy3 f a b c = lazy (\(a,b,c) -> f a b c) (a,b,c)
 
-lazy4 :: Pure p => (a -> b -> c -> d -> p) -> a -> b -> c -> d -> View
+lazy4 :: (a -> b -> c -> d -> View) -> a -> b -> c -> d -> View
 lazy4 f a b c d = lazy (\(a,b,c,d) -> f a b c d) (a,b,c,d)
+
+lazy5 :: (a -> b -> c -> d -> e -> View) -> a -> b -> c -> d -> e -> View
+lazy5 f a b c d e = lazy (\(a,b,c,d,e) -> f a b c d e) (a,b,c,d,e)
 
 -- text
 
@@ -93,11 +96,11 @@ string = text
 
 pattern LibraryComponent :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern LibraryComponent v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponent v p = lazy (\p -> ComponentView witness p Nothing v) p
+  LibraryComponent v p = ComponentView witness p Nothing v
 
 pattern Component :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern Component v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  Component v p = lazy (\p -> ComponentView witness p Nothing v) p
+  Component v p = ComponentView witness p Nothing v
 
 pattern LibraryComponentIO :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern LibraryComponentIO v p = LibraryComponent v p

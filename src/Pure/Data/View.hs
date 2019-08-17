@@ -192,8 +192,8 @@ data View where
        { renderable :: a
        } -> View
 
-  LazyView :: Pure b =>
-      { lazyFun :: a -> b
+  LazyView ::
+      { lazyFun :: a -> View
       , lazyArg :: a
       } -> View
 
