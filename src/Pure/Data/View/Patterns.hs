@@ -20,7 +20,7 @@ module Pure.Data.View.Patterns
   , HasKeyedChildren(..), pattern KeyedChildren, pattern SetKeyedChildren
   , (<|), (<||>), (|>)
   , (<||#>), (|#>)
-  , lazy, lazy2, lazy3, lazy4, lazy 5
+  , lazy, lazy2, lazy3, lazy4, lazy5
   , text, txt, string
   ) where
 
