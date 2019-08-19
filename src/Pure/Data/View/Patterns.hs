@@ -95,15 +95,14 @@ string = text
 -- NOTE: these are all equivalent now; always use Component.
 
 pattern LibraryComponent :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
-pattern LibraryComponent v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  LibraryComponent v p = ComponentView witness p Nothing v
+pattern LibraryComponent v p = Component v p
 
 pattern Component :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
-pattern Component v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (IO (props,state))) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
-  Component v p = ComponentView witness p Nothing v
+pattern Component v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (props,state)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
+  Component v p = ComponentView witness Nothing v p
 
 pattern LibraryComponentIO :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
-pattern LibraryComponentIO v p = LibraryComponent v p
+pattern LibraryComponentIO v p = Component v p
 
 pattern ComponentIO :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern ComponentIO v p = Component v p

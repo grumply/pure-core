@@ -205,9 +205,9 @@ data View where
 
   ComponentView ::
        { __comp_witness :: TypeWitness (props,state)
-       , props  :: props
        , record :: Maybe (Ref props state)
        , comp   :: Ref props state -> Comp props state
+       , props  :: props
        } -> View
 
 instance Default View where
