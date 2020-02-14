@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "pure-core";
-  version = "0.7.0.0";
+  version = "0.8.0.0";
   src = ./.;
   libraryHaskellDepends = [
     base containers pure-default pure-json pure-lifted
