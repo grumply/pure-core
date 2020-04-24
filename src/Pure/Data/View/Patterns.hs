@@ -50,6 +50,7 @@ import Data.Typeable (Typeable,TypeRep(),typeOf,typeRepFingerprint)
 import Data.List as List (null)
 import Data.Map.Lazy as Map (fromList,null,empty,union,toList,insert)
 import Data.Set as Set (empty,fromList,null,empty,union,toList,insert)
+import GHC.Stack
 import Unsafe.Coerce (unsafeCoerce)
 
 pattern EmptyMap <- (Map.null -> True) where
@@ -220,8 +221,8 @@ pattern Features fs a <- ((getFeatures &&& id) -> (fs,a)) where
 
 -- Classes
 
-pattern Class :: HasFeatures a => Txt -> a -> a
-pattern Class c a <- ((const "" &&& id) -> (c,a)) where
+pattern Class :: (HasCallStack, HasFeatures a) => Txt -> a -> a
+pattern Class c a <- (const (error "The Class pattern does not support matching, only construction. For pattern matching, use a combination of the Classes pattern with Data.List.elem.") &&& id -> (c,a)) where
   Class c a =
     let fs = getFeatures a
         cs = Set.insert c (classes fs)
@@ -242,8 +243,8 @@ pattern Classes cs a <- SetClasses cs a where
 
 -- Styles
 
-pattern Style :: HasFeatures a => Txt -> Txt -> a -> a
-pattern Style k v a <- ((const ("","") &&& id) -> ((k,v),a)) where
+pattern Style :: (HasCallStack, HasFeatures a) => Txt -> Txt -> a -> a
+pattern Style k v a <- ((const (error "The Style pattern does not support matching, only construction. For pattern matching, use a combination of the Styles pattern with Data.List.lookup.","") &&& id) -> ((k,v),a)) where
   Style k v a =
     let fs = getFeatures a
     in setFeatures (fs { styles = Map.insert k v (styles fs) }) a
@@ -261,7 +262,7 @@ pattern Styles ss v <- SetStyles ss v where
 -- Listeners
 
 pattern Listener :: HasFeatures a => Listener -> a -> a
-pattern Listener l a <- ((const (On "" ElementTarget def (\_ -> return ()) (return ())) &&& id) -> (l,a)) where
+pattern Listener l a <- ((const (error "The Listener pattern does not support matching, only construction. For pattern matching on listeners, use the Listeners pattern.") &&& id) -> (l,a)) where
   Listener l a =
     let fs = getFeatures a
     in setFeatures (fs { listeners = l : listeners fs }) a
@@ -279,7 +280,7 @@ pattern Listeners ls v <- SetListeners ls v where
 -- Attributes
 
 pattern Attribute :: HasFeatures a => Txt -> Txt -> a -> a
-pattern Attribute k v a <- ((const ("","") &&& id) -> ((k,v),a)) where
+pattern Attribute k v a <- ((const (error "The Attribute pattern does not support matching, only construction. For pattern matching on attributes, use the Attributes pattern with Data.List.lookup.","") &&& id) -> ((k,v),a)) where
   Attribute k v a =
     let fs = getFeatures a
     in setFeatures (fs { attributes = Map.insert k v (attributes fs) }) a
@@ -297,7 +298,7 @@ pattern Attributes as v <- SetAttributes as v where
 -- Properties
 
 pattern Property :: HasFeatures a => Txt -> Txt -> a -> a
-pattern Property k v a <- ((const ("","") &&& id) -> ((k,v),a)) where
+pattern Property k v a <- ((const (error "The Property pattern does not support matching, only construction. For pattern matching on properties, use the Properties pattern with Data.List.lookup.","") &&& id) -> ((k,v),a)) where
   Property k v a =
     let fs = getFeatures a
         ps = properties fs
@@ -320,7 +321,7 @@ pattern Properties ps v <- SetProperties ps v where
 -- Lifecycles
 
 pattern Lifecycle :: HasFeatures a => Lifecycle -> a -> a
-pattern Lifecycle l a <- ((const (HostRef (\_ -> return ())) &&& id) -> (l,a)) where
+pattern Lifecycle l a <- ((const (error "The Lifecycle pattern does not support matching, only construction. For pattern matching on lifecycle methods, use the Lifecycles pattern.") &&& id) -> (l,a)) where
   Lifecycle l a =
     let fs = getFeatures a
     in setFeatures (fs { lifecycles = l : lifecycles fs }) a
@@ -365,7 +366,7 @@ instance HasXLinks View where
   addXLinks _ v = v
 
 pattern XLink :: HasXLinks a => Txt -> Txt -> a -> a
-pattern XLink k v a <- ((const ("","") &&& id) -> ((k,v),a)) where
+pattern XLink k v a <- ((const (error "The XLink pattern does not support matching, only construction. For pattern matching on xlinks, use the XLinks pattern with Data.List.lookup.","") &&& id) -> ((k,v),a)) where
   XLink k v a =
     let xls = getXLinks a
     in setXLinks ((k,v):xls) a
