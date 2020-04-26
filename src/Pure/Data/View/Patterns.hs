@@ -453,20 +453,20 @@ infixl 8 <|
 (<|) a f = toView (f a)
 
 {-# INLINE (<||>) #-}
-(<||>) :: (ToView a, ToView b, HasChildren a) => a -> [b] -> View
-(<||>) v cs = toView (setChildren (fmap toView cs) v)
+(<||>) :: (ToView a, HasChildren a) => a -> [View] -> View
+(<||>) v cs = toView (setChildren cs v)
 
 {-# INLINE (<||#>) #-}
-(<||#>) :: (ToView a, ToView b, HasKeyedChildren a) => a -> [(Int,b)] -> View
-(<||#>) v cs = toView (setKeyedChildren (fmap (fmap toView) cs) v)
+(<||#>) :: (ToView a, HasKeyedChildren a) => a -> [(Int,View)] -> View
+(<||#>) v cs = toView (setKeyedChildren cs v)
 
 {-# INLINE (|>) #-}
 infixr 9 |>
-(|>) :: (ToView b, HasChildren a) => (a -> a) -> [b] -> a -> a
-(|>) f cs = setChildren (fmap toView cs) . f
+(|>) :: (HasChildren a) => (a -> a) -> [View] -> a -> a
+(|>) f cs = setChildren cs . f
 
 {-# INLINE (|#>) #-}
 infixr 9 |#>
-(|#>) :: (ToView b, HasKeyedChildren a) => (a -> a) -> [(Int,b)] -> a -> a
-(|#>) f cs = setKeyedChildren (fmap (fmap toView) cs) . f
+(|#>) :: (HasKeyedChildren a) => (a -> a) -> [(Int,View)] -> a -> a
+(|#>) f cs = setKeyedChildren cs . f
 
