@@ -83,7 +83,7 @@ lazy5 f a b c d e = lazy (\(a,b,c,d,e) -> f a b c d e) (a,b,c,d,e)
 
 -- text
 
-txt :: Txt -> View
+txt :: ToTxt a => a -> View
 txt = lazy (TextView Nothing . toTxt)
 
 -- Component
