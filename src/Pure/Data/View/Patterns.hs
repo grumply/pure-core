@@ -21,7 +21,7 @@ module Pure.Data.View.Patterns
   , (<|), (<||>), (|>)
   , (<||#>), (|#>)
   , lazy, lazy2, lazy3, lazy4, lazy5
-  , text, txt, string
+  , txt
   ) where
 
 -- This module exposes some hacky patterns due to GHCs lack of unidirectional expression patterns.
@@ -83,14 +83,8 @@ lazy5 f a b c d e = lazy (\(a,b,c,d,e) -> f a b c d e) (a,b,c,d,e)
 
 -- text
 
-text :: (ToTxt a) => a -> View
-text = lazy (TextView Nothing . toTxt)
-
 txt :: Txt -> View
-txt = text
-
-string :: String -> View
-string = text
+txt = lazy (TextView Nothing . toTxt)
 
 -- Component
 -- NOTE: these are all equivalent now; always use Component.
