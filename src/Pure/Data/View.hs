@@ -210,6 +210,11 @@ data View where
        , props  :: props
        } -> View
 
+  TaggedView :: forall tag.
+       { __tag :: TypeWitness tag 
+       , taggedView :: View 
+       } -> View
+
 instance Default View where
   {-# INLINE def #-}
   def = NullView Nothing
@@ -303,4 +308,5 @@ getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . read
 getHost TextView      {..} = fmap toNode textHost
 getHost SomeView      {}   = Nothing
 getHost PortalView    {..} = fmap toNode portalProxy
+getHost TaggedView    {..} = getHost taggedView
 getHost x                  = fmap toNode (elementHost x)
