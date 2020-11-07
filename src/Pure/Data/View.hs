@@ -214,6 +214,10 @@ data View where
        { __tag :: TypeWitness tag 
        , taggedView :: View 
        } -> View
+       
+  Prebuilt :: 
+      { prebuilt :: View 
+      } -> View
 
 instance Default View where
   {-# INLINE def #-}
@@ -309,4 +313,5 @@ getHost TextView      {..} = fmap toNode textHost
 getHost SomeView      {}   = Nothing
 getHost PortalView    {..} = fmap toNode portalProxy
 getHost TaggedView    {..} = getHost taggedView
+getHost Prebuilt      {..} = getHost prebuilt
 getHost x                  = fmap toNode (elementHost x)

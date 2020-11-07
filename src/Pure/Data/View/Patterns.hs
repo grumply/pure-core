@@ -172,6 +172,7 @@ instance HasFeatures View where
   getFeatures SomeView {} = mempty
   getFeatures PortalView{..} = getFeatures portalView
   getFeatures TaggedView{..} = getFeatures taggedView
+  getFeatures Prebuilt {..}  = getFeatures prebuilt
   getFeatures v = features v
   {-# INLINE setFeatures #-}
   setFeatures _ v@NullView {} = v
@@ -180,6 +181,7 @@ instance HasFeatures View where
   setFeatures _ v@SomeView {} = v
   setFeatures fs PortalView{..} = PortalView { portalView = setFeatures fs portalView, .. }
   setFeatures fs TaggedView{..} = TaggedView { taggedView = setFeatures fs taggedView, .. }
+  setFeatures fs Prebuilt {..}  = Prebuilt { prebuilt = setFeatures fs prebuilt }
   setFeatures fs v = v { features = fs }
 
 instance HasFeatures Features where
@@ -319,18 +321,21 @@ instance HasXLinks View where
   getXLinks KSVGView {..} = Map.toList xlinks
   getXLinks PortalView {..} = getXLinks portalView
   getXLinks TaggedView {..} = getXLinks taggedView
+  getXLinks Prebuilt {..} = getXLinks prebuilt
   getXLinks _ = []
   {-# INLINE setXLinks #-}
   setXLinks xl khtml@SVGView {} = khtml { xlinks = Map.fromList xl }
   setXLinks xl ksvg@KSVGView {} = ksvg { xlinks = Map.fromList xl }
   setXLinks xl PortalView {..} = PortalView { portalView = setXLinks xl portalView, .. }
   setXLinks xl TaggedView {..} = TaggedView { taggedView = setXLinks xl taggedView, .. }
+  setXLinks xl Prebuilt {..} = Prebuilt { prebuilt = setXLinks xl prebuilt }
   setXLinks _ v = v
   {-# INLINE addXLinks #-}
   addXLinks xl v@SVGView {} = v { xlinks = Map.union (Map.fromList xl) (xlinks v) }
   addXLinks xl v@KSVGView {} = v { xlinks = Map.union (Map.fromList xl) (xlinks v) }
   addXLinks xl PortalView {..} = PortalView { portalView = addXLinks xl portalView, .. }
   addXLinks xl TaggedView {..} = TaggedView { taggedView = addXLinks xl taggedView, .. }
+  addXLinks xl Prebuilt {..} = Prebuilt { prebuilt = addXLinks xl prebuilt }
   addXLinks _ v = v
 
 pattern XLink :: HasXLinks a => Txt -> Txt -> a -> a
@@ -360,18 +365,21 @@ instance HasChildren View where
   getChildren v@SVGView {} = children v
   getChildren PortalView {..} = getChildren portalView
   getChildren TaggedView {..} = getChildren taggedView
+  getChildren Prebuilt {..} = getChildren prebuilt
   getChildren _  = []
   {-# INLINE setChildren #-}
   setChildren cs v@HTMLView {} = v { children = cs }
   setChildren cs v@SVGView {} = v { children = cs }
   setChildren cs PortalView {..} = PortalView { portalView = setChildren cs portalView, .. }
   setChildren cs TaggedView {..} = TaggedView { taggedView = setChildren cs taggedView, .. }
+  setChildren cs Prebuilt {..} = Prebuilt { prebuilt = setChildren cs prebuilt }
   setChildren _ v = v
   {-# INLINE addChildren #-}
   addChildren cs v@HTMLView {} = v { children = children v ++ cs }
   addChildren cs v@SVGView {} = v { children = children v ++ cs }
-  addChildren cs PortalView {..} = PortalView { portalView = setChildren cs portalView, .. }
-  addChildren cs TaggedView {..} = TaggedView { taggedView = setChildren cs taggedView, .. }
+  addChildren cs PortalView {..} = PortalView { portalView = addChildren cs portalView, .. }
+  addChildren cs TaggedView {..} = TaggedView { taggedView = addChildren cs taggedView, .. }
+  addChildren cs Prebuilt {..} = Prebuilt { prebuilt = addChildren cs prebuilt }
   addChildren _ v = v
 
 pattern SetChildren :: HasChildren a => [View] -> a -> a
@@ -395,18 +403,21 @@ instance HasKeyedChildren View where
   getKeyedChildren v@SVGView {} = keyedChildren v
   getKeyedChildren PortalView {..} = getKeyedChildren portalView
   getKeyedChildren TaggedView {..} = getKeyedChildren taggedView
+  getKeyedChildren Prebuilt {..} = getKeyedChildren prebuilt
   getKeyedChildren _ = []
   {-# INLINE setKeyedChildren #-}
   setKeyedChildren cs v@KHTMLView {} = v { keyedChildren = cs }
   setKeyedChildren cs v@KSVGView {} = v { keyedChildren = cs }
   setKeyedChildren cs PortalView {..} = PortalView { portalView = setKeyedChildren cs portalView, .. }
   setKeyedChildren cs TaggedView {..} = TaggedView { taggedView = setKeyedChildren cs taggedView, .. }
+  setKeyedChildren cs Prebuilt {..} = Prebuilt { prebuilt = setKeyedChildren cs prebuilt, .. }
   setKeyedChildren _ v = v
   {-# INLINE addKeyedChildren #-}
   addKeyedChildren cs v@KHTMLView {} = v { keyedChildren = keyedChildren v ++ cs }
   addKeyedChildren cs v@KSVGView {} = v { keyedChildren = keyedChildren v ++ cs }
-  addKeyedChildren cs PortalView {..} = PortalView { portalView = setKeyedChildren cs portalView, .. }
-  addKeyedChildren cs TaggedView {..} = TaggedView { taggedView = setKeyedChildren cs taggedView, .. }
+  addKeyedChildren cs PortalView {..} = PortalView { portalView = addKeyedChildren cs portalView, .. }
+  addKeyedChildren cs TaggedView {..} = TaggedView { taggedView = addKeyedChildren cs taggedView, .. }
+  addKeyedChildren cs Prebuilt {..} = Prebuilt { prebuilt = addKeyedChildren cs prebuilt }
   addKeyedChildren _ v = v
 
 pattern SetKeyedChildren :: HasKeyedChildren a => [(Int,View)] -> a -> a
