@@ -311,6 +311,7 @@ getHost :: View -> Maybe Node
 getHost ComponentView {..} = join $ for record (getHost . unsafePerformIO . readIORef . crView)
 getHost TextView      {..} = fmap toNode textHost
 getHost SomeView      {}   = Nothing
+getHost LazyView      {}   = Nothing
 getHost PortalView    {..} = fmap toNode portalProxy
 getHost TaggedView    {..} = getHost taggedView
 getHost Prebuilt      {..} = getHost prebuilt
