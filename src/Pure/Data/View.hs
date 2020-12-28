@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, MagicHash #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, MagicHash, PolyKinds #-}
 module Pure.Data.View where
 
 -- from base
@@ -12,7 +12,7 @@ import Data.Proxy (Proxy(..))
 import Data.STRef (STRef)
 import Data.String (IsString(..))
 import Data.Traversable (for)
-import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf,typeRepFingerprint,cast)
+import Data.Typeable (Typeable,tyConName,typeRepTyCon,typeOf,typeRep,typeRepFingerprint,cast)
 import Data.Unique (Unique,newUnique)
 import GHC.Exts (reallyUnsafePtrEquality#,isTrue#)
 import GHC.Fingerprint.Type (Fingerprint())
@@ -130,10 +130,13 @@ instance Default Features where
   {-# INLINE def #-}
   def = mempty
 
-data TypeWitness a = TypeWitness { unCompWitness :: Fingerprint }
+data TypeWitness (a :: k) = TypeWitness { unCompWitness :: Fingerprint }
 
-witness :: forall a. Typeable a => TypeWitness a
-witness = TypeWitness (typeRepFingerprint $ typeOf (undefined :: a))
+witness :: forall (a :: k). Typeable a => TypeWitness a
+witness = TypeWitness (typeRepFingerprint $ typeRep (Proxy :: Proxy a))
+
+proxyWitness :: forall (a :: k). Typeable a => Proxy a -> TypeWitness a
+proxyWitness p = TypeWitness (typeRepFingerprint (typeRep p)) 
 
 sameTypeWitness :: TypeWitness a -> TypeWitness b -> Bool
 sameTypeWitness (TypeWitness fp1) (TypeWitness fp2) =
@@ -145,7 +148,7 @@ data View where
   HTMLView ::
        { elementHost :: Maybe Element
        , tag         :: Txt
-       , features    :: {-# UNPACK #-}!Features
+       , features    :: Features
        , children    :: [View]
        } -> View
 
@@ -161,30 +164,30 @@ data View where
   RawView ::
        { elementHost:: Maybe Element
        , tag        :: Txt
-       , features   :: {-# UNPACK #-}!Features
+       , features   :: Features
        , content    :: Txt
        } -> View
 
   SVGView ::
        { elementHost :: Maybe Element
        , tag         :: Txt
-       , features    :: {-# UNPACK #-}!Features
-       , xlinks      :: !(Map Txt Txt)
+       , features    :: Features
+       , xlinks      :: Map Txt Txt
        , children    :: [View]
        } -> View
 
   KHTMLView ::
        { elementHost   :: Maybe Element
        , tag           :: Txt
-       , features      :: {-# UNPACK #-}!Features
+       , features      :: Features
        , keyedChildren :: [(Int,View)]
        } -> View
 
   KSVGView ::
        { elementHost   :: Maybe Element
        , tag           :: Txt
-       , features      :: {-# UNPACK #-}!Features
-       , xlinks        :: !(Map Txt Txt)
+       , features      :: Features
+       , xlinks        :: Map Txt Txt
        , keyedChildren :: [(Int,View)]
        } -> View
 

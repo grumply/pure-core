@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings, BangPatterns, AllowAmbiguousTypes, TypeApplications #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings, BangPatterns, AllowAmbiguousTypes, TypeApplications, PolyKinds #-}
 module Pure.Data.View.Patterns
   ( pattern SimpleHTML
   , pattern SimpleSVG
@@ -46,7 +46,8 @@ import Control.Arrow ((&&&))
 import Control.Monad (void)
 import Data.Coerce (coerce)
 import Data.Monoid ((<>))
-import Data.Typeable (Typeable,TypeRep(),typeOf,typeRepFingerprint)
+import Data.Proxy (Proxy(..))
+import Data.Typeable (Typeable)
 import Data.List as List (null)
 import Data.Map.Lazy as Map (fromList,null,empty,union,toList,insert)
 import Data.Set as Set (empty,fromList,null,empty,union,toList,insert)
@@ -84,9 +85,9 @@ lazy5 f a b c d e = lazy (\(a,b,c,d,e) -> f a b c d e) (a,b,c,d,e)
 txt :: ToTxt a => a -> View
 txt = lazy (TextView Nothing . toTxt)
 
-pattern Tagged :: forall tag. Typeable tag => View -> View
-pattern Tagged v <- TaggedView (sameTypeWitness (witness :: TypeWitness tag) -> True) v where
-  Tagged t = TaggedView (witness @tag) t
+pattern Tagged :: forall (tag :: k). Typeable tag => View -> View
+pattern Tagged v <- TaggedView (sameTypeWitness (proxyWitness (Proxy :: Proxy tag)) -> True) v where
+  Tagged t = TaggedView (proxyWitness (Proxy :: Proxy tag)) t
 
 pattern Component :: forall props state. (Typeable props, Typeable state) => (Ref props state -> Comp props state) -> props -> View
 pattern Component v p <- ComponentView (sameTypeWitness (witness :: TypeWitness (props,state)) -> True) (unsafeCoerce -> p) _ (unsafeCoerce -> v) where
