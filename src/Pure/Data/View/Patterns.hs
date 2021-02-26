@@ -4,6 +4,7 @@ module Pure.Data.View.Patterns
   , pattern SimpleSVG
   , pattern Portal
   , pattern Component
+  , pattern Txt
   , pattern Tag
   , pattern Tagged
   , pattern Null
@@ -40,7 +41,7 @@ import Pure.Data.View
 import Pure.Data.Lifted (Element,Node)
 
 -- from pure-txt
-import Pure.Data.Txt (Txt,ToTxt(..))
+import Pure.Data.Txt (Txt,ToTxt(..),FromTxt(..))
 
 -- from base
 import Control.Arrow ((&&&))
@@ -85,6 +86,10 @@ lazy5 f a b c d e = lazy (\(a,b,c,d,e) -> f a b c d e) (a,b,c,d,e)
 
 txt :: ToTxt a => a -> View
 txt = lazy (TextView Nothing . toTxt)
+
+pattern Txt :: Txt -> View
+pattern Txt t <- (TextView _ t) where
+  Txt t = TextView Nothing t
 
 pattern Tag :: forall tag. Typeable tag => View -> View
 pattern Tag v <- TaggedView (sameTypeWitness (proxyWitness (Proxy :: Proxy tag)) -> True) v where
