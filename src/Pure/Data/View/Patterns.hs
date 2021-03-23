@@ -441,23 +441,28 @@ pattern KeyedChildren ks v <- ((getKeyedChildren &&& id) -> (ks,v)) where
 
 infixl 8 <|
 {-# INLINE (<|) #-}
+{-# SPECIALIZE (<|) :: View -> (View -> View) -> View #-}
 (<|) :: ToView b => a -> (a -> b) -> View
 (<|) a f = toView (f a)
 
 {-# INLINE (<||>) #-}
+{-# SPECIALIZE (<||>) :: View -> [View] -> View #-}
 (<||>) :: (ToView a, HasChildren a) => a -> [View] -> View
 (<||>) v cs = toView (setChildren cs v)
 
 {-# INLINE (<||#>) #-}
+{-# SPECIALIZE (<||#>) :: View -> [(Int,View)] -> View #-}
 (<||#>) :: (ToView a, HasKeyedChildren a) => a -> [(Int,View)] -> View
 (<||#>) v cs = toView (setKeyedChildren cs v)
 
 {-# INLINE (|>) #-}
+{-# SPECIALIZE (|>) :: (View -> View) -> [View] -> View -> View #-}
 infixr 9 |>
 (|>) :: (HasChildren a) => (a -> a) -> [View] -> a -> a
 (|>) f cs = setChildren cs . f
 
 {-# INLINE (|#>) #-}
+{-# SPECIALIZE (|#>) :: (View -> View) -> [(Int,View)] -> View -> View #-}
 infixr 9 |#>
 (|#>) :: (HasKeyedChildren a) => (a -> a) -> [(Int,View)] -> a -> a
 (|#>) f cs = setKeyedChildren cs . f
