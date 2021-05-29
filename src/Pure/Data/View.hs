@@ -50,7 +50,7 @@ data Listener =
     , eventStopper  :: IO ()
     }
 
-data Lifecycle =
+newtype Lifecycle =
   HostRef
     { withHost :: Node -> IO ()
     }
