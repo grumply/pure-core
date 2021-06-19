@@ -1,7 +1,8 @@
-{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings, BangPatterns, AllowAmbiguousTypes, TypeApplications, PolyKinds #-}
+{-# LANGUAGE PatternSynonyms, ViewPatterns, ScopedTypeVariables, RecordWildCards, OverloadedStrings, BangPatterns, AllowAmbiguousTypes, TypeApplications, PolyKinds, MagicHash #-}
 module Pure.Data.View.Patterns
   ( pattern SimpleHTML
   , pattern SimpleSVG
+  , pattern Static
   , pattern Portal
   , pattern Component
   , pattern Txt
@@ -53,6 +54,7 @@ import Data.Typeable (Typeable)
 import Data.List as List (null)
 import Data.Map.Lazy as Map (fromList,null,empty,union,toList,insert)
 import Data.Set as Set (empty,fromList,null,empty,union,toList,insert)
+import GHC.Exts (isTrue#,unsafeCoerce#,reallyUnsafePtrEquality#)
 import GHC.Stack
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -71,6 +73,16 @@ pattern EmptyList <- (List.null -> True) where
 
 lazy :: (a -> View) -> a -> View
 lazy = LazyView
+
+materializeStaticView :: View -> Maybe View
+materializeStaticView (LazyView f a) 
+  | isTrue# (unsafeCoerce# reallyUnsafePtrEquality# a ()) 
+  = Just (f a)
+materializeStaticView _ = Nothing
+
+pattern Static :: View -> View
+pattern Static v <- (materializeStaticView -> Just v) where
+  Static v = LazyView (\() -> v) ()
 
 lazy2 :: (a -> b -> View) -> a -> b -> View
 lazy2 f a b = lazy (\(a,b) -> f a b) (a,b)
@@ -126,8 +138,6 @@ viewSVGTag _ = Nothing
 pattern SimpleSVG :: Txt -> View
 pattern SimpleSVG tag <- (viewSVGTag -> Just tag) where
   SimpleSVG tag = SVGView Nothing tag (Features_ EmptySet EmptyMap EmptyMap EmptyMap EmptyList EmptyList) EmptyMap EmptyList
-
--- Raw
 
 toRaw :: View -> View
 toRaw HTMLView {..} = RawView { content = "", .. }
