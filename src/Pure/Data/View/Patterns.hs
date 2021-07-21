@@ -16,7 +16,7 @@ module Pure.Data.View.Patterns
   , pattern Style, pattern Styles, pattern SetStyles
   , pattern Property, pattern Properties, pattern SetProperties
   , pattern Attribute, pattern Attributes, pattern SetAttributes
-  , pattern Lifecycle, pattern Lifecycles, pattern SetLifecycles, pattern WithHost
+  , pattern Lifecycle, pattern Lifecycles, pattern SetLifecycles, pattern WithHost, pattern Host
   , pattern Listener, pattern Listeners, pattern SetListeners
   , HasXLinks(..), pattern XLink, pattern XLinks, pattern SetXLinks
   , HasChildren(..), pattern Children, pattern SetChildren
@@ -39,7 +39,7 @@ import Pure.Data.Default (Default(..))
 import Pure.Data.View
 
 -- from pure-lifted
-import Pure.Data.Lifted (Element,Node)
+import Pure.Data.Lifted (Element,Node(..),nullJSV)
 
 -- from pure-txt
 import Pure.Data.Txt (Txt,ToTxt(..),FromTxt(..))
@@ -326,8 +326,13 @@ pattern Lifecycles lc v <- (((lifecycles . getFeatures) &&& id) -> (lc,v)) where
     let fs = getFeatures v
     in setFeatures (fs { lifecycles = lc ++ lifecycles fs }) v
 
+{-# DEPRECATED WithHost "Use Host instead." #-}
 pattern WithHost :: HasFeatures a => (Node -> IO ()) -> a -> a
-pattern WithHost f a = Lifecycle (HostRef f) a
+pattern WithHost f a <- Lifecycle (HostRef _ f) a where
+  WithHost f a = Lifecycle (HostRef (coerce nullJSV) f) a
+
+pattern Host :: HasFeatures a => Node -> (Node -> IO ()) -> a -> a
+pattern Host h f a = Lifecycle (HostRef h f) a
 
 class HasXLinks a where
   getXLinks :: a -> [(Txt,Txt)]

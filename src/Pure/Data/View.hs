@@ -50,9 +50,10 @@ data Listener =
     , eventStopper  :: IO ()
     }
 
-newtype Lifecycle =
+data Lifecycle =
   HostRef
-    { withHost :: Node -> IO ()
+    { host :: Node
+    , withHost :: Node -> IO ()
     }
 
 data Comp props state = Comp
