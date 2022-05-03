@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, MagicHash, PolyKinds #-}
+{-# LANGUAGE CPP, ExistentialQuantification, TypeFamilies, PatternSynonyms, ViewPatterns, ScopedTypeVariables, RankNTypes, DefaultSignatures, FlexibleContexts, FlexibleInstances, UndecidableInstances, RecordWildCards, BangPatterns, GADTs, MagicHash, PolyKinds, TypeApplications #-}
 module Pure.Data.View where
 
 -- from base
@@ -47,6 +47,7 @@ data Listener =
     , eventTarget   :: Target
     , eventOptions  :: Options
     , eventAction   :: Evt -> IO ()
+    , eventUpdate   :: (Evt -> IO ()) -> IO ()
     , eventStopper  :: IO ()
     }
 
@@ -192,7 +193,7 @@ data View where
        , keyedChildren :: [(Int,View)]
        } -> View
 
-  SomeView :: Pure a =>
+  SomeView :: (Typeable a, Pure a) =>
        { renderable :: a
        } -> View
 
@@ -238,9 +239,10 @@ instance FromTxt View where
 asProxyOf :: a -> Proxy a
 asProxyOf _ = Proxy
 
-class Typeable a => Pure a where
+class Pure a where
   {-# NOINLINE __pure_witness #-}
   __pure_witness :: Proxy a -> TypeWitness a
+  default __pure_witness :: Typeable a => Proxy a -> TypeWitness a
   __pure_witness _ = witness
   view :: a -> View
 
@@ -264,9 +266,9 @@ instance {-# OVERLAPS #-} ToView View where
   {-# INLINE toView #-}
   toView = id
 
-pattern View :: forall a. (Pure a, Typeable a) => a -> View
-pattern View a <- (SomeView (cast -> Just a)) where
-  View a = SomeView a
+pattern View :: (Typeable x, Pure x) => x -> View
+pattern View x <- (SomeView (cast -> Just x)) where
+  View x = SomeView x
 
 {-# INLINE get #-}
 get :: Ref props state -> IO state
